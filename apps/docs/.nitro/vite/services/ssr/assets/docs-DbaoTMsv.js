@@ -1,5 +1,5 @@
 import { u as useRouterState, n as jsxRuntimeExports, O as Outlet } from "../server.js";
-import { L as Link } from "./router-_Z8es15s.js";
+import { L as Link } from "./router-CRyDoK5j.js";
 import "node:async_hooks";
 import "node:stream";
 import "stream";

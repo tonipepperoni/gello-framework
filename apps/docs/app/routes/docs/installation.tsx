@@ -24,8 +24,6 @@ pnpm add -D drizzle-kit @types/pg`} />
       <CodeBlock lang="bash" code={`pnpm add ioredis
 pnpm add -D @types/ioredis`} />
 
-      <h2>Optional: Queues (BullMQ)</h2>
-      <CodeBlock lang="bash" code={`pnpm add bullmq`} />
 
       <h2>Project Structure</h2>
       <CodeBlock lang="text" code={`src/

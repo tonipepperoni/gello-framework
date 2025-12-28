@@ -10,73 +10,106 @@ function QueuesPage() {
     <article className="prose">
       <h1>Queues</h1>
       <p className="text-xl text-zinc-400 mb-8">
-        BullMQ + Effect — jobs as values, workers as Layers
+        Pure Effect queues — jobs as values, workers as Layers
       </p>
 
       <h2>The Pattern</h2>
       <p>
         Queues follow the same pattern: <code>Context.Tag</code> for the service,{' '}
-        <code>Layer.scoped</code> with <code>acquireRelease</code> for lifecycle management.
-        BullMQ handles the heavy lifting — Effect manages the resources.
+        <code>Layer.scoped</code> for lifecycle management. No external queue dependency —
+        just Effect primitives with Redis or Postgres as the backing store.
       </p>
 
       <h2>Queue Service Layer</h2>
-      <CodeBlock code={`import { Context, Effect, Layer } from "effect"
-import { Queue, Worker, type Job } from "bullmq"
-import IORedis from "ioredis"
+      <CodeBlock code={`import { Context, Effect, Layer, Queue, Fiber } from "effect"
 
 // 1) Define the service interface
-interface QueueService {
-  add: <T>(name: string, data: T) => Effect.Effect<void>
-  addBulk: <T>(name: string, jobs: T[]) => Effect.Effect<void>
+interface JobQueue<T> {
+  enqueue: (job: T) => Effect.Effect<void>
+  enqueueBatch: (jobs: T[]) => Effect.Effect<void>
+  process: (handler: (job: T) => Effect.Effect<void>) => Effect.Effect<never>
 }
 
-class JobQueue extends Context.Tag("JobQueue")<JobQueue, QueueService>() {}
+class EmailQueue extends Context.Tag("EmailQueue")<
+  EmailQueue,
+  JobQueue<{ to: string; subject: string; body: string }>
+>() {}
 
-// 2) Create the Layer with proper lifecycle
-const JobQueueLive = Layer.scoped(
-  JobQueue,
+// 2) Create the Layer with Effect.Queue (in-memory) or Redis-backed
+const EmailQueueLive = Layer.scoped(
+  EmailQueue,
   Effect.gen(function* () {
-    const cfg = yield* Config
-    const connection = new IORedis(cfg.REDIS_URL, { maxRetriesPerRequest: null })
-    const queue = new Queue("default", { connection })
-
-    yield* Effect.addFinalizer(() =>
-      Effect.tryPromise(async () => {
-        await queue.close()
-        await connection.quit()
-      }).pipe(Effect.orDie)
-    )
+    const queue = yield* Queue.unbounded<{ to: string; subject: string; body: string }>()
 
     return {
-      add: (name, data) =>
-        Effect.tryPromise(() => queue.add(name, data)).pipe(Effect.asVoid),
-      addBulk: (name, jobs) =>
-        Effect.tryPromise(() =>
-          queue.addBulk(jobs.map((data) => ({ name, data })))
-        ).pipe(Effect.asVoid)
+      enqueue: (job) => Queue.offer(queue, job),
+      enqueueBatch: (jobs) => Queue.offerAll(queue, jobs),
+      process: (handler) =>
+        Effect.forever(
+          Effect.gen(function* () {
+            const job = yield* Queue.take(queue)
+            yield* handler(job).pipe(
+              Effect.catchAll((e) => Effect.log(\`Job failed: \${e}\`))
+            )
+          })
+        )
     }
   })
-).pipe(Layer.provide(ConfigLive))`} />
+)`} />
+
+      <h2>Redis-Backed Queue</h2>
+      <CodeBlock code={`import { Context, Effect, Layer, Stream, Schedule } from "effect"
+
+// Redis-backed queue with persistence
+const EmailQueueRedis = Layer.scoped(
+  EmailQueue,
+  Effect.gen(function* () {
+    const redis = yield* Redis
+    const queueKey = "queue:email"
+
+    return {
+      enqueue: (job) =>
+        Effect.tryPromise(() =>
+          redis.lpush(queueKey, JSON.stringify(job))
+        ).pipe(Effect.asVoid),
+
+      enqueueBatch: (jobs) =>
+        Effect.tryPromise(() =>
+          redis.lpush(queueKey, ...jobs.map((j) => JSON.stringify(j)))
+        ).pipe(Effect.asVoid),
+
+      process: (handler) =>
+        Effect.forever(
+          Effect.gen(function* () {
+            // Blocking pop with timeout
+            const result = yield* Effect.tryPromise(() =>
+              redis.brpop(queueKey, 5)
+            )
+            if (result) {
+              const job = JSON.parse(result[1])
+              yield* handler(job).pipe(
+                Effect.retry(Schedule.exponential("1 second").pipe(
+                  Schedule.compose(Schedule.recurs(3))
+                )),
+                Effect.catchAll((e) => Effect.log(\`Job failed after retries: \${e}\`))
+              )
+            }
+          })
+        )
+    }
+  })
+).pipe(Layer.provide(RedisLive))`} />
 
       <h2>Dispatching Jobs</h2>
-      <CodeBlock code={`import * as S from "@effect/schema/Schema"
-
-const SendEmailPayload = S.Struct({
-  to: S.String,
-  subject: S.String,
-  body: S.String
-})
-
-HttpRouter.post("/users", Effect.gen(function* () {
+      <CodeBlock code={`HttpRouter.post("/users", Effect.gen(function* () {
   const body = yield* HttpServerRequest.schemaBodyJson(CreateUser)
   const repo = yield* UserRepo
-  const queue = yield* JobQueue
+  const queue = yield* EmailQueue
 
   const user = yield* repo.create(body)
 
   // Dispatch welcome email job
-  yield* queue.add("send-email", {
+  yield* queue.enqueue({
     to: user.email,
     subject: "Welcome!",
     body: "Thanks for signing up."
@@ -85,103 +118,127 @@ HttpRouter.post("/users", Effect.gen(function* () {
   return yield* HttpServerResponse.schemaJson(User)(user)
 }))`} />
 
-      <h2>Worker Layer</h2>
-      <CodeBlock code={`// Workers are also Layers — compose at the edge
-const WorkerLayer = Layer.scoped(
-  Layer.Tag<void>()("Worker"),
-  Effect.gen(function* () {
-    const cfg = yield* Config
-    const mailer = yield* MailService
-
-    const connection = new IORedis(cfg.REDIS_URL, { maxRetriesPerRequest: null })
-    const worker = new Worker(
-      "default",
-      async (job: Job) => {
-        switch (job.name) {
-          case "send-email":
-            await Effect.runPromise(mailer.send(job.data))
-            break
-          // Add more job handlers
-        }
-      },
-      { connection, concurrency: 5 }
-    )
-
-    yield* Effect.addFinalizer(() =>
-      Effect.tryPromise(async () => {
-        await worker.close()
-        await connection.quit()
-      }).pipe(Effect.orDie)
-    )
-
-    yield* Effect.log("Worker started")
-  })
-).pipe(Layer.provide(ConfigLive), Layer.provide(MailServiceLive))`} />
-
-      <h2>Running the Worker</h2>
+      <h2>Worker Process</h2>
       <CodeBlock code={`// src/worker.ts
 import { pipe } from "effect"
+import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime"
 
+const WorkerLayer = Layer.scopedDiscard(
+  Effect.gen(function* () {
+    const queue = yield* EmailQueue
+    const mailer = yield* MailService
+
+    yield* Effect.log("Worker started, processing jobs...")
+
+    // Fork the processor to run in background
+    yield* queue.process((job) =>
+      Effect.gen(function* () {
+        yield* mailer.send(job)
+        yield* Effect.log(\`Sent email to \${job.to}\`)
+      })
+    ).pipe(Effect.forkScoped)
+  })
+)
+
 const MainLayer = pipe(
   WorkerLayer,
-  Layer.provide(ConfigLive),
-  Layer.provide(MailServiceLive),
-  Layer.provide(RedisLive)
+  Layer.provideMerge(EmailQueueRedis),
+  Layer.provideMerge(MailServiceLive),
+  Layer.provideMerge(RedisLive),
+  Layer.provideMerge(ConfigLive)
 )
 
 Layer.launch(MainLayer).pipe(NodeRuntime.runMain)`} />
       <CodeBlock lang="bash" code={`npx tsx src/worker.ts`} />
 
-      <h2>Typed Job Handlers</h2>
-      <CodeBlock code={`// Type-safe job definitions
-type JobHandlers = {
-  "send-email": { to: string; subject: string; body: string }
-  "process-upload": { userId: string; fileUrl: string }
-  "generate-report": { reportId: string; format: "pdf" | "csv" }
-}
+      <h2>Typed Job Definitions</h2>
+      <CodeBlock code={`import * as S from "@effect/schema/Schema"
 
-const handleJob = <K extends keyof JobHandlers>(
-  name: K,
-  handler: (data: JobHandlers[K]) => Effect.Effect<void>
-) => ({ name, handler })
-
-const handlers = [
-  handleJob("send-email", (data) =>
-    Effect.gen(function* () {
-      const mailer = yield* MailService
-      yield* mailer.send(data)
-    })
-  ),
-  handleJob("process-upload", (data) =>
-    Effect.gen(function* () {
-      const storage = yield* StorageService
-      yield* storage.process(data.fileUrl, data.userId)
-    })
+// Define job schemas
+const EmailJob = S.Struct({
+  to: S.String,
+  subject: S.String,
+  body: S.String,
+  priority: S.optional(S.Literal("low", "normal", "high")).pipe(
+    S.withDefault(() => "normal" as const)
   )
-]`} />
-
-      <h2>Testing</h2>
-      <CodeBlock code={`// Mock queue for tests
-const JobQueueTest = Layer.succeed(JobQueue, {
-  add: () => Effect.void,
-  addBulk: () => Effect.void
 })
 
-// Track dispatched jobs
-const createTestQueue = () => {
-  const jobs: Array<{ name: string; data: unknown }> = []
+const UploadJob = S.Struct({
+  userId: S.String,
+  fileUrl: S.String,
+  contentType: S.String
+})
+
+// Union of all job types
+const Job = S.Union(
+  S.Struct({ type: S.Literal("email"), data: EmailJob }),
+  S.Struct({ type: S.Literal("upload"), data: UploadJob })
+)
+
+type Job = S.Schema.Type<typeof Job>`} />
+
+      <h2>Parallel Workers</h2>
+      <CodeBlock code={`// Run N workers in parallel
+const parallelWorkers = (n: number) =>
+  Layer.scopedDiscard(
+    Effect.gen(function* () {
+      const queue = yield* EmailQueue
+      const mailer = yield* MailService
+
+      // Fork N workers
+      yield* Effect.all(
+        Array.from({ length: n }, (_, i) =>
+          queue.process((job) =>
+            Effect.gen(function* () {
+              yield* Effect.log(\`Worker \${i}: processing job\`)
+              yield* mailer.send(job)
+            })
+          ).pipe(Effect.forkScoped)
+        ),
+        { concurrency: "unbounded" }
+      )
+
+      yield* Effect.log(\`Started \${n} workers\`)
+    })
+  )`} />
+
+      <h2>Testing</h2>
+      <CodeBlock code={`// In-memory test queue that tracks jobs
+const createTestQueue = <T>() => {
+  const jobs: T[] = []
+  const processed: T[] = []
+
   return {
-    layer: Layer.succeed(JobQueue, {
-      add: (name, data) => Effect.sync(() => { jobs.push({ name, data }) }),
-      addBulk: (name, items) => Effect.sync(() => {
-        items.forEach((data) => jobs.push({ name, data }))
-      })
+    layer: Layer.succeed(EmailQueue, {
+      enqueue: (job) => Effect.sync(() => { jobs.push(job) }),
+      enqueueBatch: (batch) => Effect.sync(() => { jobs.push(...batch) }),
+      process: (handler) =>
+        Effect.gen(function* () {
+          while (jobs.length > 0) {
+            const job = jobs.shift()!
+            yield* handler(job)
+            processed.push(job)
+          }
+        })
     }),
-    getJobs: () => jobs
+    getEnqueued: () => jobs,
+    getProcessed: () => processed
   }
-}`} />
+}
+
+// Usage in tests
+const testQueue = createTestQueue()
+
+await Effect.runPromise(
+  Effect.gen(function* () {
+    const queue = yield* EmailQueue
+    yield* queue.enqueue({ to: "test@test.com", subject: "Test", body: "Hello" })
+    expect(testQueue.getEnqueued()).toHaveLength(1)
+  }).pipe(Effect.provide(testQueue.layer))
+)`} />
     </article>
   );
 }

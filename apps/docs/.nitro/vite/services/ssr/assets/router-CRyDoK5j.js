@@ -29319,10 +29319,18 @@ const Route$8 = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Gello - Effect-Powered Backend Framework" },
-      { name: "description", content: "A sophisticated TypeScript backend framework powered by Effect. Express-like HTTP, Laravel-like DI, Drizzle ORM, and more." }
+      { title: "Gello - FP-Core Backend Framework" },
+      { name: "description", content: "Non-modular, purely functional backend development with Effect. Context.Tag + Layer, @effect/platform HTTP, type-safe everything." },
+      { property: "og:title", content: "Gello - FP-Core Backend Framework" },
+      { property: "og:description", content: "Non-modular, purely functional backend development with Effect." },
+      { property: "og:url", content: "https://gello.net" },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" }
     ],
-    links: [{ rel: "icon", href: "/favicon.svg" }]
+    links: [
+      { rel: "icon", href: "/favicon.svg" },
+      { rel: "canonical", href: "https://gello.net" }
+    ]
   })
 });
 function RootDocument({ children }) {
@@ -29346,7 +29354,7 @@ function RootComponent() {
         /* @__PURE__ */ jsxRuntimeExports.jsx(
           "a",
           {
-            href: "https://github.com/gello/gello",
+            href: "https://github.com/tonipepperoni/gello-framework",
             className: "text-sm text-zinc-400 hover:text-white transition-colors",
             target: "_blank",
             rel: "noopener noreferrer",
@@ -29358,11 +29366,11 @@ function RootComponent() {
     /* @__PURE__ */ jsxRuntimeExports.jsx(Outlet, {})
   ] });
 }
-const $$splitComponentImporter$7 = () => import("./docs-BSfG-qhH.js");
+const $$splitComponentImporter$7 = () => import("./docs-DbaoTMsv.js");
 const Route$7 = createFileRoute("/docs")({
   component: lazyRouteComponent($$splitComponentImporter$7, "component")
 });
-const $$splitComponentImporter$6 = () => import("./index-DDgKG3pM.js");
+const $$splitComponentImporter$6 = () => import("./index-DwyFNI28.js");
 const Route$6 = createFileRoute("/")({
   component: lazyRouteComponent($$splitComponentImporter$6, "component")
 });

@@ -67,8 +67,8 @@ function HomePage() {
           icon="🗄️"
         />
         <FeatureCard
-          title="BullMQ Queues"
-          description="Jobs as values, workers as Layers. Effect manages the lifecycle, BullMQ does the work."
+          title="Effect Queues"
+          description="Jobs as values, workers as Layers. Pure Effect — no external queue dependency."
           icon="📬"
         />
       </div>

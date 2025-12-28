@@ -1,0 +1,53 @@
+{
+  "name": "docs",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/docs/app",
+  "projectType": "application",
+  "tags": ["app", "type:docs"],
+  "targets": {
+    "dev": {
+      "command": "vite dev --port 3001",
+      "options": {
+        "cwd": "apps/docs"
+      }
+    },
+    "build": {
+      "command": "vite build",
+      "options": {
+        "cwd": "apps/docs"
+      },
+      "outputs": ["{projectRoot}/.output"]
+    },
+    "start": {
+      "command": "node .output/server/index.mjs",
+      "options": {
+        "cwd": "apps/docs"
+      },
+      "dependsOn": ["build"]
+    },
+    "typecheck": {
+      "command": "tsc --noEmit",
+      "options": {
+        "cwd": "apps/docs"
+      }
+    },
+    "deploy:link": {
+      "command": "vercel link",
+      "options": {
+        "cwd": "apps/docs"
+      }
+    },
+    "deploy": {
+      "command": "vercel build --prod && vercel deploy --prebuilt --prod --yes",
+      "options": {
+        "cwd": "apps/docs"
+      }
+    },
+    "deploy:preview": {
+      "command": "vercel build && vercel deploy --prebuilt --yes",
+      "options": {
+        "cwd": "apps/docs"
+      }
+    }
+  }
+}

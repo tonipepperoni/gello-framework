@@ -1,0 +1,21 @@
+{
+  "name": "db-seeder",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "tools/db-seeder/src",
+  "projectType": "library",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "@nx/esbuild:esbuild",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/tools/db-seeder",
+        "main": "tools/db-seeder/src/index.ts",
+        "tsConfig": "tools/db-seeder/tsconfig.lib.json",
+        "assets": ["tools/db-seeder/*.md"],
+        "format": ["cjs"],
+        "generatePackageJson": true
+      }
+    }
+  }
+}

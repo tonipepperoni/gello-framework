@@ -18,9 +18,9 @@ function HomePage() {
       </h1>
 
       <p className="mb-8 max-w-2xl text-xl text-zinc-400">
-        A sophisticated TypeScript backend framework powered by{' '}
+        FP-core backend framework built on{' '}
         <strong className="text-white">Effect</strong>.
-        Express-like HTTP, Laravel-like DI, type-safe everything.
+        Non-modular, purely functional — program = value, interpret at the edge.
       </p>
 
       <div className="flex flex-wrap justify-center gap-4 mb-16">
@@ -31,7 +31,7 @@ function HomePage() {
           Get Started
         </Link>
         <a
-          href="https://github.com/gello/gello"
+          href="https://github.com/tonipepperoni/gello-framework"
           className="inline-flex items-center justify-center rounded-lg border border-zinc-700 bg-zinc-900 px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
           target="_blank"
           rel="noopener noreferrer"
@@ -42,34 +42,34 @@ function HomePage() {
 
       <div className="grid gap-8 md:grid-cols-3 max-w-5xl">
         <FeatureCard
-          title="Effect-Powered"
-          description="Built on Effect for type-safe error handling, dependency injection, and composable architecture."
+          title="Context.Tag + Layer"
+          description="No DI container, no decorators. Just compose Layers for dependencies and yield* from context."
           icon="⚡"
         />
         <FeatureCard
-          title="Laravel-like DX"
-          description="Familiar patterns like service providers, migrations, queues, and Artisan-like CLI tools."
-          icon="🎯"
+          title="Scoped Resources"
+          description="Database pools, Redis connections — all managed with Layer.scoped and acquireRelease."
+          icon="🔒"
         />
         <FeatureCard
-          title="Type-Safe Database"
-          description="Drizzle ORM integration with Effect for fully type-safe database operations."
-          icon="🗄️"
-        />
-        <FeatureCard
-          title="Powerful Queues"
-          description="Background job processing with retry logic, failure handling, and multiple drivers."
-          icon="📬"
-        />
-        <FeatureCard
-          title="Express-like HTTP"
-          description="Intuitive routing API that feels like Express but with full type safety."
+          title="@effect/platform HTTP"
+          description="Type-safe routing with HttpRouter, schema validation at boundaries, proper middleware."
           icon="🌐"
         />
         <FeatureCard
-          title="CLI Tooling"
-          description="Generate models, migrations, jobs, and more with the Gello CLI."
-          icon="⌨️"
+          title="Single Composition Point"
+          description="All layers merge at one root, then Layer.launch. No scattered configuration."
+          icon="🎯"
+        />
+        <FeatureCard
+          title="Drizzle + Effect"
+          description="Type-safe database with proper resource lifecycle. Pool created, used, closed."
+          icon="🗄️"
+        />
+        <FeatureCard
+          title="BullMQ Queues"
+          description="Jobs as values, workers as Layers. Effect manages the lifecycle, BullMQ does the work."
+          icon="📬"
         />
       </div>
 
@@ -77,9 +77,7 @@ function HomePage() {
         <h2 className="mb-4 text-lg font-semibold text-white">Quick Start</h2>
         <pre className="overflow-x-auto rounded-lg bg-zinc-950 p-4 text-left text-sm">
           <code className="text-zinc-300">
-{`npm create gello@latest my-app
-cd my-app
-npm run dev`}
+{`pnpm add effect @effect/schema @effect/platform @effect/platform-node`}
           </code>
         </pre>
       </div>

@@ -1,9 +1,8 @@
 // Re-export Fumadocs UI components directly
 // See: https://fumadocs.dev/docs/ui/components
 
-// Code display
-export { DynamicCodeBlock as CodeBlock } from 'fumadocs-ui/components/dynamic-codeblock';
-export { Pre } from 'fumadocs-ui/components/codeblock';
+// Code display - custom lightweight version for Cloudflare Workers size limits
+export { CodeBlock } from './CodeBlock';
 
 // Callouts & alerts
 export { Callout } from 'fumadocs-ui/components/callout';
@@ -46,5 +45,5 @@ export {
 // Custom wrapper for consistent page structure
 export { DocsContent, type TOCItem } from './DocsContent';
 
-// Mermaid diagrams
+// Mermaid diagrams (client-only)
 export { Mermaid } from './Mermaid';

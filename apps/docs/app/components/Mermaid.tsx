@@ -1,74 +1,98 @@
 'use client';
 
-import { useEffect, useId, useState } from 'react';
-import mermaid from 'mermaid';
+import { use, useId, useState, useEffect } from 'react';
+import { ClientOnly } from '@tanstack/react-router';
 
-interface MermaidProps {
-  chart: string;
-  className?: string;
+// Promise cache for mermaid module
+const moduleCache = new Map<string, Promise<unknown>>();
+
+function cachePromise<T>(key: string, create: () => Promise<T>): Promise<T> {
+  const cached = moduleCache.get(key);
+  if (cached) return cached as Promise<T>;
+  const promise = create();
+  moduleCache.set(key, promise);
+  return promise;
 }
 
-// Cache for rendered diagrams
-const cache = new Map<string, string>();
+// SVG render cache
+const svgCache = new Map<string, string>();
 
-export function Mermaid({ chart, className }: MermaidProps) {
-  const id = useId().replace(/:/g, '-');
-  const [svg, setSvg] = useState<string>('');
-  const [error, setError] = useState<string | null>(null);
+interface MermaidContentProps {
+  chart: string;
+}
+
+function MermaidContent({ chart }: MermaidContentProps) {
+  const id = useId();
+  const [svg, setSvg] = useState<string>(() => svgCache.get(chart) ?? '');
+
+  // Dynamically import mermaid only on client
+  // @vite-ignore prevents bundling in SSR
+  const { default: mermaid } = use(
+    cachePromise('mermaid', () => import(/* @vite-ignore */ 'mermaid'))
+  );
 
   useEffect(() => {
-    // Initialize mermaid with theme settings
+    // Initialize mermaid with theme
     mermaid.initialize({
       startOnLoad: false,
-      theme: 'neutral',
-      securityLevel: 'loose',
-      fontFamily: 'inherit',
+      theme: 'dark',
     });
 
+    // If we have cached SVG, use it
+    if (svgCache.has(chart)) {
+      setSvg(svgCache.get(chart)!);
+      return;
+    }
+
+    // Render the chart
     const render = async () => {
-      const cacheKey = chart;
-
-      // Check cache first
-      if (cache.has(cacheKey)) {
-        setSvg(cache.get(cacheKey)!);
-        return;
-      }
-
       try {
-        const { svg: renderedSvg } = await mermaid.render(`mermaid-${id}`, chart);
-        cache.set(cacheKey, renderedSvg);
+        const { svg: renderedSvg } = await mermaid.render(
+          `mermaid-${id.replace(/:/g, '-')}`,
+          chart
+        );
+        svgCache.set(chart, renderedSvg);
         setSvg(renderedSvg);
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to render diagram');
-        console.error('Mermaid render error:', err);
+      } catch (error) {
+        console.error('Mermaid render error:', error);
       }
     };
 
     render();
-  }, [chart, id]);
-
-  if (error) {
-    return (
-      <div className="p-4 border border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded-lg">
-        <p className="text-red-600 dark:text-red-400 text-sm">Failed to render diagram: {error}</p>
-        <pre className="mt-2 text-xs overflow-auto">{chart}</pre>
-      </div>
-    );
-  }
+  }, [chart, id, mermaid]);
 
   if (!svg) {
     return (
-      <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg animate-pulse">
-        <div className="h-32 bg-gray-100 dark:bg-gray-800 rounded" />
+      <div className="flex items-center justify-center p-8 bg-fd-card rounded-lg border border-fd-border">
+        <div className="animate-pulse text-fd-muted-foreground">
+          Loading diagram...
+        </div>
       </div>
     );
   }
 
   return (
     <div
-      className={`my-6 flex justify-center overflow-x-auto ${className || ''}`}
+      className="mermaid-diagram overflow-x-auto p-4 bg-fd-card rounded-lg border border-fd-border [&_svg]:max-w-full [&_svg]:h-auto"
       dangerouslySetInnerHTML={{ __html: svg }}
     />
+  );
+}
+
+export interface MermaidProps {
+  chart: string;
+}
+
+export function Mermaid({ chart }: MermaidProps) {
+  return (
+    <ClientOnly
+      fallback={
+        <div className="flex items-center justify-center p-8 bg-fd-card rounded-lg border border-fd-border">
+          <div className="text-fd-muted-foreground">Loading diagram...</div>
+        </div>
+      }
+    >
+      <MermaidContent chart={chart} />
+    </ClientOnly>
   );
 }

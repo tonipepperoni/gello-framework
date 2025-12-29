@@ -45,50 +45,43 @@ function DocsIntroduction() {
       </p>
 
       <h2 id="architecture-overview">Architecture Overview</h2>
-      <Mermaid chart={`
-flowchart TB
-    subgraph Edge["Edge (Runtime)"]
+      <Mermaid chart={`graph TB
+    subgraph Edge["EDGE (Runtime)"]
         HTTP[HTTP Server]
         CLI[CLI Commands]
-        Worker[Queue Workers]
+        Queue[Queue Workers]
     end
 
-    subgraph App["Application Layer"]
-        Router[Router & Middleware]
-        Handlers[Route Handlers]
+    subgraph App["APPLICATION LAYER"]
+        Router[Router/Middleware]
+        Routes[Route Handlers]
         Jobs[Job Handlers]
+        Router --> Routes
     end
 
-    subgraph Services["Service Layer"]
+    subgraph Services["SERVICE LAYER"]
         UserSvc[UserService]
         CacheSvc[CacheService]
         QueueSvc[QueueService]
     end
 
-    subgraph Infra["Infrastructure Layer"]
+    subgraph Infra["INFRASTRUCTURE LAYER"]
         DB[(Database)]
         Redis[(Redis)]
-        FS[File System]
+        FS[(File System)]
     end
 
     HTTP --> Router
-    CLI --> Handlers
-    Worker --> Jobs
+    CLI --> Routes
+    Queue --> Jobs
 
-    Router --> Handlers
-    Handlers --> UserSvc
-    Handlers --> CacheSvc
+    Routes --> UserSvc
+    Routes --> CacheSvc
     Jobs --> QueueSvc
 
     UserSvc --> DB
     CacheSvc --> Redis
-    QueueSvc --> Redis
-
-    style Edge fill:#e1f5fe
-    style App fill:#f3e5f5
-    style Services fill:#e8f5e9
-    style Infra fill:#fff3e0
-`} />
+    QueueSvc --> FS`} />
 
       <h2 id="core-philosophy">Core Philosophy</h2>
 

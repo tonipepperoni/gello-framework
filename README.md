@@ -1,29 +1,23 @@
-<p align="center">
-  <pre align="center">
- ██████╗ ███████╗██╗     ██╗      ██████╗
-██╔════╝ ██╔════╝██║     ██║     ██╔═══██╗
-██║  ███╗█████╗  ██║     ██║     ██║   ██║
-██║   ██║██╔══╝  ██║     ██║     ██║   ██║
-╚██████╔╝███████╗███████╗███████╗╚██████╔╝
- ╚═════╝ ╚══════╝╚══════╝╚══════╝ ╚═════╝
-  </pre>
-</p>
+<div align="center">
+  <img src="https://gello.net/logo.svg" alt="Gello" width="120" height="120" />
 
-<p align="center">
-  <strong>A TypeScript backend framework built on Effect</strong>
-</p>
+  <h1>Gello</h1>
+  <p><strong>The Effect-powered backend framework</strong></p>
+  <p>Laravel's elegance meets Effect's type safety. No decorators, no magic—just functions.</p>
 
-<p align="center">
-  <a href="https://www.npmjs.com/package/@gello/core"><img src="https://img.shields.io/npm/v/@gello/core?style=flat-square" alt="Latest Version"></a>
-  <a href="https://www.npmjs.com/package/gello"><img src="https://img.shields.io/npm/dm/gello?style=flat-square" alt="Downloads"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/npm/l/@gello/core?style=flat-square" alt="License"></a>
-</p>
+  <p>
+    <a href="https://www.npmjs.com/package/@gello/core"><img src="https://img.shields.io/npm/v/@gello/core?style=flat-square&color=8B5CF6" alt="npm version"></a>
+    <a href="https://www.npmjs.com/package/gello"><img src="https://img.shields.io/npm/dm/gello?style=flat-square&color=6D28D9" alt="npm downloads"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8B5CF6?style=flat-square" alt="license"></a>
+    <a href="https://effect.website"><img src="https://img.shields.io/badge/powered%20by-Effect-black?style=flat-square" alt="Effect"></a>
+  </p>
 
-<p align="center">
-  <a href="https://gello.net/docs">Documentation</a> •
-  <a href="https://gello.net/docs/installation">Installation</a> •
-  <a href="https://gello.net/docs/cli">CLI</a>
-</p>
+  <p>
+    <a href="https://gello.net/docs">Documentation</a> •
+    <a href="https://gello.net/docs/installation">Installation</a> •
+    <a href="https://gello.net/docs/cli">CLI</a>
+  </p>
+</div>
 
 ---
 
@@ -134,28 +128,7 @@ npx gello serve           # Start dev server with hot reload
 npx gello route:list      # Display registered routes
 ```
 
-The `route:list` command shows a beautiful TUI:
-
-```
- ██████╗ ███████╗██╗     ██╗      ██████╗
-██╔════╝ ██╔════╝██║     ██║     ██╔═══██╗
-██║  ███╗█████╗  ██║     ██║     ██║   ██║
-██║   ██║██╔══╝  ██║     ██║     ██║   ██║
-╚██████╔╝███████╗███████╗███████╗╚██████╔╝
- ╚═════╝ ╚══════╝╚══════╝╚══════╝ ╚═════╝
-
-Route List • My App
-
-Total: 5 routes  │  GET: 3  POST: 1  DELETE: 1
-
-METHOD    PATH              HANDLER
-────────────────────────────────────
-GET       /                 index
-GET       /users            listUsers
-GET       /users/:id        getUser
-POST      /users            createUser
-DELETE    /users/:id        deleteUser
-```
+The `route:list` command shows a beautiful TUI with your registered routes.
 
 ## Architecture
 

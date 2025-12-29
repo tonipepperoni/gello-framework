@@ -4,12 +4,9 @@ import { routeTree } from './routeTree.gen';
 export function getRouter() {
   const router = createRouter({
     routeTree,
-    scrollRestoration: true,
-    // Preload routes on hover to reduce flash
+    // Preload routes on hover/intent to have content ready before navigation
     defaultPreload: 'intent',
     defaultPreloadStaleTime: 0,
-    // Enable View Transitions API for smooth page transitions
-    defaultViewTransition: true,
   });
 
   return router;

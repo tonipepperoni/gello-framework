@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState, type ReactNode } from 'react';
+import { Suspense, use, useState, type ReactNode } from 'react';
 import { ClientOnly } from '@tanstack/react-router';
 import { clsx } from 'clsx';
 
@@ -16,7 +16,7 @@ const LANG_ALIASES: Record<string, string> = {
   shell: 'bash',
 };
 
-const SUPPORTED_LANGS = ['typescript', 'tsx', 'javascript', 'jsx', 'bash', 'json', 'text'];
+const SUPPORTED_LANGS = ['typescript', 'tsx', 'javascript', 'jsx', 'bash', 'json'];
 
 // Global cache for highlighted HTML - persists across navigations
 const htmlCache = new Map<string, string>();
@@ -35,21 +35,18 @@ function cachePromise<T>(key: string, create: () => Promise<T>): Promise<T> {
 async function getHighlighter() {
   return cachePromise('shiki-highlighter', async () => {
     const { createHighlighter } = await import(/* @vite-ignore */ 'shiki');
-    const engine = await import(/* @vite-ignore */ 'shiki/engine/javascript').then(
-      (res) => res.createJavaScriptRegexEngine()
-    );
 
     return createHighlighter({
       themes: ['github-dark', 'github-light'],
-      langs: ['typescript', 'tsx', 'javascript', 'jsx', 'bash', 'json', 'text'],
-      engine,
+      langs: ['typescript', 'tsx', 'javascript', 'jsx', 'bash', 'json'],
     });
   });
 }
 
 function highlightToHtml(code: string, lang: string): Promise<string> {
   const resolvedLang = LANG_ALIASES[lang] ?? lang;
-  const finalLang = SUPPORTED_LANGS.includes(resolvedLang) ? resolvedLang : 'text';
+  const isSupported = SUPPORTED_LANGS.includes(resolvedLang);
+  const finalLang = isSupported ? resolvedLang : 'typescript'; // Default to typescript for unsupported
   const cacheKey = `${finalLang}:${code}`;
 
   const cached = htmlCache.get(cacheKey);
@@ -184,21 +181,23 @@ export interface CodeBlockProps {
   children?: ReactNode;
 }
 
-export function CodeBlock({ code, lang = 'text', title }: CodeBlockProps) {
+export function CodeBlock({ code, lang = 'typescript', title }: CodeBlockProps) {
   // Check if we have cached HTML - if so, use it for the fallback too
   const resolvedLang = LANG_ALIASES[lang] ?? lang;
-  const finalLang = SUPPORTED_LANGS.includes(resolvedLang) ? resolvedLang : 'text';
+  const isSupported = SUPPORTED_LANGS.includes(resolvedLang);
+  const finalLang = isSupported ? resolvedLang : 'typescript';
   const cacheKey = `${finalLang}:${code}`;
   const cachedHtml = htmlCache.get(cacheKey);
 
   const fallbackHtml = cachedHtml ?? getPlainCodeHtml(code);
+  const fallback = <div dangerouslySetInnerHTML={{ __html: fallbackHtml }} />;
 
   return (
     <CodeBlockWrapper code={code} title={title}>
-      <ClientOnly
-        fallback={<div dangerouslySetInnerHTML={{ __html: fallbackHtml }} />}
-      >
-        <CodeBlockContent code={code} lang={lang} />
+      <ClientOnly fallback={fallback}>
+        <Suspense fallback={fallback}>
+          <CodeBlockContent code={code} lang={lang} />
+        </Suspense>
       </ClientOnly>
     </CodeBlockWrapper>
   );

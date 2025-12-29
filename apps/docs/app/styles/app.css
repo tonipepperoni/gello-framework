@@ -2,46 +2,18 @@
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
 
-/* View Transitions for smooth page navigation */
-@view-transition {
-  navigation: auto;
+/* Stable scrollbar - prevents CLS from scrollbar appearing/disappearing */
+html {
+  overflow-y: scroll;
 }
 
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation-duration: 150ms;
-  animation-timing-function: ease-out;
-}
-
-::view-transition-old(root) {
-  animation-name: fade-out;
-}
-
-::view-transition-new(root) {
-  animation-name: fade-in;
-}
-
-@keyframes fade-out {
-  from { opacity: 1; }
-  to { opacity: 0; }
-}
-
-@keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-/* Prevent layout shift during page transitions */
-[data-docs-page] {
+/* Prevent layout shift during navigation */
+.fd-layout {
   min-height: 100vh;
+  background: var(--fd-background);
 }
 
-/* Smooth content transitions */
-.fd-docs-body {
-  transition: opacity 100ms ease-out;
-}
-
-/* Keep sidebar stable during transitions */
+/* Keep sidebar stable */
 .fd-sidebar {
-  contain: layout style;
+  contain: layout style paint;
 }

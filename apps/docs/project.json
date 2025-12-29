@@ -16,7 +16,7 @@
       "options": {
         "cwd": "apps/docs"
       },
-      "outputs": ["{projectRoot}/.output"]
+      "outputs": ["{projectRoot}/dist"]
     },
     "start": {
       "command": "node .output/server/index.mjs",

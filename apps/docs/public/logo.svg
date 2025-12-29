@@ -1,12 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 100" fill="none">
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="text-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" style="stop-color:#8B5CF6"/>
-      <stop offset="100%" style="stop-color:#6D28D9"/>
+      <stop offset="100%" style="stop-color:#C4B5FD"/>
     </linearGradient>
   </defs>
-  <!-- Rounded square background -->
-  <rect x="10" y="10" width="100" height="100" rx="24" fill="url(#bg)"/>
-  <!-- Stylized G letter -->
-  <path d="M60 30 C42 30 28 44 28 62 C28 80 42 94 60 94 C72 94 82 88 88 78 L88 62 L60 62 L60 74 L76 74 L76 76 C73 82 67 86 60 86 C48 86 38 76 38 62 C38 48 48 38 60 38 C68 38 74 42 78 48 L90 42 C84 32 72 30 60 30 Z" fill="white"/>
+  <text font-family="monospace" font-size="14" font-weight="bold" fill="url(#text-gradient)">
+    <tspan x="10" y="20"> ██████╗ ███████╗██╗     ██╗      ██████╗ </tspan>
+    <tspan x="10" y="35">██╔════╝ ██╔════╝██║     ██║     ██╔═══██╗</tspan>
+    <tspan x="10" y="50">██║  ███╗█████╗  ██║     ██║     ██║   ██║</tspan>
+    <tspan x="10" y="65">██║   ██║██╔══╝  ██║     ██║     ██║   ██║</tspan>
+    <tspan x="10" y="80">╚██████╔╝███████╗███████╗███████╗╚██████╔╝</tspan>
+    <tspan x="10" y="95"> ╚═════╝ ╚══════╝╚══════╝╚══════╝ ╚═════╝ </tspan>
+  </text>
 </svg>

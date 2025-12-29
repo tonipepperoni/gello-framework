@@ -1,23 +1,24 @@
-<div align="center">
-  <img src="https://gello.net/logo.svg" alt="Gello" width="120" height="120" />
+<p align="center">
+  <img src="https://gello.net/logo.svg" alt="Gello" width="400" />
+</p>
 
-  <h1>Gello</h1>
-  <p><strong>The Effect-powered backend framework</strong></p>
-  <p>Laravel's elegance meets Effect's type safety. No decorators, no magic—just functions.</p>
+<p align="center">
+  <strong>The Effect-powered backend framework</strong><br/>
+  Laravel's elegance meets Effect's type safety. No decorators, no magic—just functions.
+</p>
 
-  <p>
-    <a href="https://www.npmjs.com/package/@gello/core"><img src="https://img.shields.io/npm/v/@gello/core?style=flat-square&color=8B5CF6" alt="npm version"></a>
-    <a href="https://www.npmjs.com/package/gello"><img src="https://img.shields.io/npm/dm/gello?style=flat-square&color=6D28D9" alt="npm downloads"></a>
-    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8B5CF6?style=flat-square" alt="license"></a>
-    <a href="https://effect.website"><img src="https://img.shields.io/badge/powered%20by-Effect-black?style=flat-square" alt="Effect"></a>
-  </p>
+<p align="center">
+  <a href="https://www.npmjs.com/package/@gello/core"><img src="https://img.shields.io/npm/v/@gello/core?style=flat-square&color=8B5CF6" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/gello"><img src="https://img.shields.io/npm/dm/gello?style=flat-square&color=6D28D9" alt="npm downloads"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8B5CF6?style=flat-square" alt="license"></a>
+  <a href="https://effect.website"><img src="https://img.shields.io/badge/powered%20by-Effect-black?style=flat-square" alt="Effect"></a>
+</p>
 
-  <p>
-    <a href="https://gello.net/docs">Documentation</a> •
-    <a href="https://gello.net/docs/installation">Installation</a> •
-    <a href="https://gello.net/docs/cli">CLI</a>
-  </p>
-</div>
+<p align="center">
+  <a href="https://gello.net/docs">Documentation</a> •
+  <a href="https://gello.net/docs/installation">Installation</a> •
+  <a href="https://gello.net/docs/cli">CLI</a>
+</p>
 
 ---
 

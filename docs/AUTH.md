@@ -2152,66 +2152,55 @@ yield* EmailVerification.resend(userId);
 
 ### 8.5 Configuration
 
-```typescript
-// config/auth.ts - Auth configuration using Gello's dot notation config
+Following Laravel's approach: minimal `.env` variables, sensible defaults in config files.
 
-import { Config, env } from "@gello/core-config";
+```bash
+# .env - Only secrets and environment-specific values
+APP_KEY=base64:your-32-char-key    # Required
+APP_URL=http://localhost:3000
+SESSION_DRIVER=redis               # Optional: memory | redis | database
+
+# OAuth (only if using social auth)
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+```
+
+```typescript
+// config/auth.ts - Sensible defaults, env vars only for secrets
+import { env } from "@gello/core-config";
 
 export const authConfig = {
   jwt: {
-    secret: env("JWT_SECRET"), // Required - will fail if not set
-    algorithm: env("JWT_ALGORITHM", "HS256"),
-    accessTokenTtl: env("JWT_ACCESS_TTL", "15m"),   // 15 minutes
-    refreshTokenTtl: env("JWT_REFRESH_TTL", "7d"),  // 7 days
-    issuer: env("JWT_ISSUER", ""),
-    audience: env("JWT_AUDIENCE", ""),
+    secret: env("APP_KEY"),        // Reuse APP_KEY
+    algorithm: "HS256",
+    ttl: "15m",
+    refreshTtl: "7d",
   },
   session: {
-    driver: env("SESSION_DRIVER", "memory"), // memory | redis | database
-    cookieName: env("SESSION_COOKIE", "__session"),
-    httpOnly: true,
-    secure: env("APP_ENV") === "production",
-    sameSite: env("SESSION_SAME_SITE", "lax") as "strict" | "lax" | "none",
-    maxAge: env("SESSION_LIFETIME", "7d"),
+    driver: env("SESSION_DRIVER", "memory"),
+    lifetime: "7d",
+    cookie: {
+      name: "__session",
+      httpOnly: true,
+      secure: env("APP_ENV") === "production",
+      sameSite: "lax",
+    },
   },
   password: {
-    minLength: Number(env("PASSWORD_MIN_LENGTH", "8")),
-    maxLength: Number(env("PASSWORD_MAX_LENGTH", "128")),
-    requireUppercase: env("PASSWORD_REQUIRE_UPPERCASE", "true") === "true",
-    requireLowercase: env("PASSWORD_REQUIRE_LOWERCASE", "true") === "true",
-    requireNumbers: env("PASSWORD_REQUIRE_NUMBERS", "true") === "true",
-    requireSymbols: env("PASSWORD_REQUIRE_SYMBOLS", "false") === "true",
-    bcryptRounds: Number(env("PASSWORD_BCRYPT_ROUNDS", "12")),
+    bcryptRounds: 12,
+    rules: { minLength: 8, requireUppercase: true, requireLowercase: true, requireNumbers: true },
+    resetExpire: "1h",
   },
-  rateLimit: {
-    login: {
-      maxAttempts: Number(env("RATE_LIMIT_LOGIN_ATTEMPTS", "5")),
-      windowMs: env("RATE_LIMIT_LOGIN_WINDOW", "15m"),
-    },
-    passwordReset: {
-      maxAttempts: Number(env("RATE_LIMIT_RESET_ATTEMPTS", "3")),
-      windowMs: env("RATE_LIMIT_RESET_WINDOW", "1h"),
-    },
-    verification: {
-      maxAttempts: Number(env("RATE_LIMIT_VERIFY_ATTEMPTS", "3")),
-      windowMs: env("RATE_LIMIT_VERIFY_WINDOW", "1h"),
-    },
+  throttle: {
+    login: { attempts: 5, decay: "15m" },
+    passwordReset: { attempts: 3, decay: "1h" },
   },
-  lockout: {
-    enabled: env("LOCKOUT_ENABLED", "true") === "true",
-    maxAttempts: Number(env("LOCKOUT_MAX_ATTEMPTS", "10")),
-    duration: env("LOCKOUT_DURATION", "1h"),
-  },
-  oauth: {
-    stateDriver: env("OAUTH_STATE_DRIVER", "memory"), // memory | redis
-    stateTtl: env("OAUTH_STATE_TTL", "10m"),
-  },
+  lockout: { enabled: true, maxAttempts: 10, duration: "1h" },
 };
 
-// Usage in services via Config service (dot notation)
-const jwtSecret = yield* Config.string("auth.jwt.secret");
-const bcryptRounds = yield* Config.number("auth.password.bcryptRounds", 12);
-const lockoutEnabled = yield* Config.boolean("auth.lockout.enabled", true);
+// Access via dot notation
+const secret = yield* Config.string("auth.jwt.secret");
+const driver = yield* Config.string("auth.session.driver");
 ```
 
 ---
@@ -2344,59 +2333,140 @@ export const AppUserRepositoryLive = Layer.succeed(
 
 ## Appendix A: Configuration Reference
 
-### Environment Variables
+### Environment Variables (Minimal)
+
+Following Laravel's pattern - only secrets and environment-specific values in `.env`:
 
 ```bash
-# .env - Auth configuration
+# .env - Only essential environment variables
 
-# JWT
-JWT_SECRET=your-secret-key-min-32-chars      # Required
-JWT_ALGORITHM=HS256                           # HS256 | HS384 | HS512 | RS256 | RS384 | RS512
-JWT_ACCESS_TTL=15m                            # Access token lifetime
-JWT_REFRESH_TTL=7d                            # Refresh token lifetime
-JWT_ISSUER=                                   # Optional JWT issuer
-JWT_AUDIENCE=                                 # Optional JWT audience
+APP_KEY=base64:your-32-char-app-key          # Required - used for encryption
+APP_URL=http://localhost:3000
 
-# Session
-SESSION_DRIVER=memory                         # memory | redis | database
-SESSION_COOKIE=__session                      # Cookie name
-SESSION_SAME_SITE=lax                         # strict | lax | none
-SESSION_LIFETIME=7d                           # Session lifetime
+# Session driver (optional - defaults to memory)
+SESSION_DRIVER=redis                          # memory | redis | database
 
-# Password
-PASSWORD_MIN_LENGTH=8
-PASSWORD_MAX_LENGTH=128
-PASSWORD_REQUIRE_UPPERCASE=true
-PASSWORD_REQUIRE_LOWERCASE=true
-PASSWORD_REQUIRE_NUMBERS=true
-PASSWORD_REQUIRE_SYMBOLS=false
-PASSWORD_BCRYPT_ROUNDS=12
-
-# Rate Limiting
-RATE_LIMIT_LOGIN_ATTEMPTS=5
-RATE_LIMIT_LOGIN_WINDOW=15m
-RATE_LIMIT_RESET_ATTEMPTS=3
-RATE_LIMIT_RESET_WINDOW=1h
-RATE_LIMIT_VERIFY_ATTEMPTS=3
-RATE_LIMIT_VERIFY_WINDOW=1h
-
-# Account Lockout
-LOCKOUT_ENABLED=true
-LOCKOUT_MAX_ATTEMPTS=10
-LOCKOUT_DURATION=1h
-
-# OAuth
-OAUTH_STATE_DRIVER=memory                     # memory | redis
-OAUTH_STATE_TTL=10m
-
-# OAuth Providers
+# OAuth providers (only if using social auth)
 GITHUB_CLIENT_ID=
 GITHUB_CLIENT_SECRET=
-GITHUB_REDIRECT_URI=http://localhost:3000/auth/github/callback
-
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
-GOOGLE_REDIRECT_URI=http://localhost:3000/auth/google/callback
+```
+
+### Config File (Sensible Defaults)
+
+```typescript
+// config/auth.ts - Laravel-style config with sensible defaults
+
+import { env } from "@gello/core-config";
+
+export const authConfig = {
+  /*
+  |--------------------------------------------------------------------------
+  | Authentication Defaults
+  |--------------------------------------------------------------------------
+  */
+  defaults: {
+    guard: "session",
+  },
+
+  /*
+  |--------------------------------------------------------------------------
+  | JWT Configuration
+  |--------------------------------------------------------------------------
+  */
+  jwt: {
+    secret: env("APP_KEY"),
+    algorithm: "HS256",
+    ttl: "15m",           // Access token lifetime
+    refreshTtl: "7d",     // Refresh token lifetime
+  },
+
+  /*
+  |--------------------------------------------------------------------------
+  | Session Configuration
+  |--------------------------------------------------------------------------
+  */
+  session: {
+    driver: env("SESSION_DRIVER", "memory"),
+    lifetime: "7d",
+    cookie: {
+      name: "__session",
+      httpOnly: true,
+      secure: env("APP_ENV") === "production",
+      sameSite: "lax" as const,
+    },
+  },
+
+  /*
+  |--------------------------------------------------------------------------
+  | Password Configuration
+  |--------------------------------------------------------------------------
+  */
+  password: {
+    bcryptRounds: 12,
+    rules: {
+      minLength: 8,
+      requireUppercase: true,
+      requireLowercase: true,
+      requireNumbers: true,
+      requireSymbols: false,
+    },
+    // Password reset link expires after this duration
+    resetExpire: "1h",
+  },
+
+  /*
+  |--------------------------------------------------------------------------
+  | Rate Limiting
+  |--------------------------------------------------------------------------
+  */
+  throttle: {
+    login: { attempts: 5, decay: "15m" },
+    passwordReset: { attempts: 3, decay: "1h" },
+    verification: { attempts: 3, decay: "1h" },
+  },
+
+  /*
+  |--------------------------------------------------------------------------
+  | Account Lockout
+  |--------------------------------------------------------------------------
+  */
+  lockout: {
+    enabled: true,
+    maxAttempts: 10,
+    duration: "1h",
+  },
+
+  /*
+  |--------------------------------------------------------------------------
+  | OAuth Providers
+  |--------------------------------------------------------------------------
+  */
+  providers: {
+    github: {
+      clientId: env("GITHUB_CLIENT_ID"),
+      clientSecret: env("GITHUB_CLIENT_SECRET"),
+      redirectUri: `${env("APP_URL")}/auth/github/callback`,
+      scopes: ["read:user", "user:email"],
+    },
+    google: {
+      clientId: env("GOOGLE_CLIENT_ID"),
+      clientSecret: env("GOOGLE_CLIENT_SECRET"),
+      redirectUri: `${env("APP_URL")}/auth/google/callback`,
+      scopes: ["openid", "email", "profile"],
+    },
+  },
+
+  /*
+  |--------------------------------------------------------------------------
+  | Email Verification
+  |--------------------------------------------------------------------------
+  */
+  verification: {
+    expire: "24h",
+  },
+};
 ```
 
 ### Config Layer Setup
@@ -2405,81 +2475,29 @@ GOOGLE_REDIRECT_URI=http://localhost:3000/auth/google/callback
 // config/index.ts
 import { Config } from "@gello/core-config";
 import { authConfig } from "./auth";
-import { appConfig } from "./app";
 
 export const AppConfigLayer = Config.layer({
-  app: appConfig,
+  app: {
+    name: env("APP_NAME", "Gello"),
+    env: env("APP_ENV", "local"),
+    url: env("APP_URL", "http://localhost:3000"),
+    key: env("APP_KEY"),
+  },
   auth: authConfig,
 });
-
-// main.ts - Provide config to application
-const AppLayers = Layer.mergeAll(
-  AppConfigLayer,
-  AuthServiceLive,
-  SessionStoreLive,
-  // ...
-);
-
-runApp(app, AppLayers);
 ```
 
-### Accessing Config in Services
+### Accessing Config
 
 ```typescript
-// In any Effect-based service
-const makeTokenService = Effect.gen(function* () {
-  const config = yield* Config;
+// Dot notation access in services
+const secret = yield* Config.string("auth.jwt.secret");
+const bcryptRounds = yield* Config.number("auth.password.bcryptRounds");
+const sessionDriver = yield* Config.string("auth.session.driver");
 
-  // Dot notation access with type coercion
-  const secret = yield* config.string("auth.jwt.secret");
-  const algorithm = yield* config.string("auth.jwt.algorithm", "HS256");
-  const accessTtl = yield* config.string("auth.jwt.accessTokenTtl", "15m");
-  const bcryptRounds = yield* config.number("auth.password.bcryptRounds", 12);
-  const lockoutEnabled = yield* config.boolean("auth.lockout.enabled", true);
-
-  // Parse duration strings
-  const ttlDuration = Duration.decode(accessTtl);
-
-  return TokenService.of({
-    // ... implementation using config values
-  });
-});
-
-// Or use the helper functions directly
-import { Config } from "@gello/core-config";
-
-const handler = Effect.gen(function* () {
-  const maxAttempts = yield* Config.number("auth.rateLimit.login.maxAttempts", 5);
-  // ...
-});
-```
-
-### OAuth Provider Config
-
-```typescript
-// config/auth.ts
-export const authConfig = {
-  // ... other config
-  oauth: {
-    providers: {
-      github: {
-        clientId: env("GITHUB_CLIENT_ID"),
-        clientSecret: env("GITHUB_CLIENT_SECRET"),
-        redirectUri: env("GITHUB_REDIRECT_URI"),
-        scopes: ["read:user", "user:email"],
-      },
-      google: {
-        clientId: env("GOOGLE_CLIENT_ID"),
-        clientSecret: env("GOOGLE_CLIENT_SECRET"),
-        redirectUri: env("GOOGLE_REDIRECT_URI"),
-        scopes: ["openid", "email", "profile"],
-      },
-    },
-  },
-};
-
-// Access in OAuth service
-const githubConfig = yield* Config.get<OAuthProviderConfig>("auth.oauth.providers.github");
+// Get nested objects
+const githubConfig = yield* Config.get("auth.providers.github");
+const throttleConfig = yield* Config.get("auth.throttle.login");
 ```
 
 ---

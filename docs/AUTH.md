@@ -8,12 +8,22 @@
 
 This document specifies a comprehensive authentication and authorization system for Gello, designed with:
 
+- **Laravel Sanctum's dual-mode auth** - SPA cookies + API tokens in one system
 - **Laravel's simplicity** for common auth patterns
 - **Supabase's flexibility** for token and session management
 - **NestJS CASL's power** for fine-grained authorization
 - **Effect-native patterns** for type safety and composability
 
 The system follows Gello's hexagonal DDD architecture with Effect-based services.
+
+### Key Insight: Sanctum's Two Problems
+
+Like Laravel Sanctum, Gello Auth solves **two separate problems**:
+
+1. **API Tokens** - Stateless tokens for mobile apps and third-party clients
+2. **SPA Authentication** - Cookie-based sessions for first-party SPAs with CSRF protection
+
+You can use either or both. The guard automatically detects which method is being used.
 
 ---
 
@@ -729,6 +739,479 @@ export const extractBearerToken = (
 
     return AccessToken(authHeader.substring(7));
   });
+```
+
+### 3.8 API Tokens (Sanctum-Style)
+
+Inspired by Laravel Sanctum, Gello provides a lightweight token system for API authentication. Users can create multiple personal access tokens with fine-grained abilities.
+
+#### HasApiTokens Mixin
+
+```typescript
+// libs/auth/core/domain/has-api-tokens.ts
+
+import { Effect, Option } from "effect";
+
+/**
+ * Personal Access Token stored in database
+ */
+export interface PersonalAccessToken {
+  readonly id: TokenId;
+  readonly userId: UserId;
+  readonly name: string;
+  readonly token: string;              // SHA-256 hashed
+  readonly abilities: ReadonlyArray<string>;
+  readonly lastUsedAt: Option.Option<Date>;
+  readonly expiresAt: Option.Option<Date>;
+  readonly createdAt: Date;
+}
+
+/**
+ * Result of creating a token - includes plain text (only shown once)
+ */
+export interface NewAccessToken {
+  readonly accessToken: PersonalAccessToken;
+  readonly plainTextToken: string;     // Only available at creation
+}
+
+/**
+ * Mixin interface for models that can have API tokens
+ */
+export interface HasApiTokens {
+  /**
+   * Create a new personal access token
+   *
+   * @example
+   * ```typescript
+   * const { plainTextToken } = yield* user.createToken("mobile-app", ["read", "write"]);
+   * // Store plainTextToken - it won't be shown again
+   * ```
+   */
+  createToken(
+    name: string,
+    abilities?: ReadonlyArray<string>,
+    expiresAt?: Date
+  ): Effect.Effect<NewAccessToken, TokenError>;
+
+  /**
+   * Get all tokens for this user
+   */
+  tokens(): Effect.Effect<ReadonlyArray<PersonalAccessToken>>;
+
+  /**
+   * Revoke a specific token by ID
+   */
+  revokeToken(tokenId: TokenId): Effect.Effect<void, TokenNotFoundError>;
+
+  /**
+   * Revoke all tokens
+   */
+  revokeAllTokens(): Effect.Effect<number>;
+
+  /**
+   * Get the current token (from request context)
+   */
+  currentAccessToken(): Effect.Effect<Option.Option<PersonalAccessToken>>;
+
+  /**
+   * Check if current token has ability
+   */
+  tokenCan(ability: string): Effect.Effect<boolean>;
+
+  /**
+   * Check if current token lacks ability
+   */
+  tokenCant(ability: string): Effect.Effect<boolean>;
+}
+
+/**
+ * Apply HasApiTokens mixin to a user class
+ */
+export const withApiTokens = <T extends { id: UserId }>(
+  user: T
+): T & HasApiTokens => {
+  return {
+    ...user,
+
+    createToken: (name, abilities = ["*"], expiresAt) =>
+      Effect.gen(function* () {
+        const tokenStore = yield* PersonalAccessTokenStore;
+
+        // Generate random token
+        const plainText = crypto.randomUUID() + crypto.randomUUID();
+        const hashed = yield* hashToken(plainText);
+
+        const token = yield* tokenStore.create({
+          userId: user.id,
+          name,
+          token: hashed,
+          abilities,
+          expiresAt: Option.fromNullable(expiresAt),
+        });
+
+        return {
+          accessToken: token,
+          plainTextToken: `${token.id}|${plainText}`,
+        };
+      }),
+
+    tokens: () =>
+      Effect.flatMap(PersonalAccessTokenStore, (store) =>
+        store.forUser(user.id)
+      ),
+
+    revokeToken: (tokenId) =>
+      Effect.flatMap(PersonalAccessTokenStore, (store) =>
+        store.delete(tokenId)
+      ),
+
+    revokeAllTokens: () =>
+      Effect.flatMap(PersonalAccessTokenStore, (store) =>
+        store.deleteForUser(user.id)
+      ),
+
+    currentAccessToken: () =>
+      Effect.serviceOption(CurrentAccessToken),
+
+    tokenCan: (ability) =>
+      Effect.gen(function* () {
+        const maybeToken = yield* Effect.serviceOption(CurrentAccessToken);
+        return Option.match(maybeToken, {
+          onNone: () => false,
+          onSome: (token) =>
+            token.abilities.includes("*") || token.abilities.includes(ability),
+        });
+      }),
+
+    tokenCant: (ability) =>
+      Effect.map(user.tokenCan(ability), (can) => !can),
+  };
+};
+```
+
+#### Token Store
+
+```typescript
+// libs/auth/core/contracts/token-store.ts
+
+export interface PersonalAccessTokenStorePort {
+  create(data: CreateTokenData): Effect.Effect<PersonalAccessToken, TokenError>;
+  find(tokenId: TokenId): Effect.Effect<Option.Option<PersonalAccessToken>>;
+  findByToken(hashedToken: string): Effect.Effect<Option.Option<PersonalAccessToken>>;
+  forUser(userId: UserId): Effect.Effect<ReadonlyArray<PersonalAccessToken>>;
+  touch(tokenId: TokenId): Effect.Effect<void>;  // Update lastUsedAt
+  delete(tokenId: TokenId): Effect.Effect<void, TokenNotFoundError>;
+  deleteForUser(userId: UserId): Effect.Effect<number>;
+  deleteExpired(): Effect.Effect<number>;  // Prune expired tokens
+}
+
+export class PersonalAccessTokenStore extends Context.Tag("@gello/PersonalAccessTokenStore")<
+  PersonalAccessTokenStore,
+  PersonalAccessTokenStorePort
+>() {}
+```
+
+#### Token Abilities Middleware
+
+```typescript
+// libs/auth/core/middleware/abilities.ts
+
+/**
+ * Require ALL specified abilities (AND logic)
+ *
+ * @example
+ * ```typescript
+ * Route.get("/orders")
+ *   .pipe(Route.use(requireAuth))
+ *   .pipe(Route.use(abilities("check-status", "place-orders")))
+ * ```
+ */
+export const abilities = (
+  ...requiredAbilities: string[]
+): Middleware<CurrentAccessToken, ForbiddenError> => ({
+  name: `abilities:${requiredAbilities.join(",")}`,
+  apply: <A, E, R>(handler: Effect.Effect<A, E, R>) =>
+    Effect.gen(function* () {
+      const token = yield* CurrentAccessToken;
+
+      // Wildcard grants all abilities
+      if (token.abilities.includes("*")) {
+        return yield* handler;
+      }
+
+      // Check ALL abilities are present
+      const missing = requiredAbilities.filter(
+        (ability) => !token.abilities.includes(ability)
+      );
+
+      if (missing.length > 0) {
+        return yield* Effect.fail(
+          ForbiddenError.missingAbility(missing.join(", "))
+        );
+      }
+
+      return yield* handler;
+    }),
+});
+
+/**
+ * Require ANY of the specified abilities (OR logic)
+ *
+ * @example
+ * ```typescript
+ * Route.get("/orders")
+ *   .pipe(Route.use(requireAuth))
+ *   .pipe(Route.use(ability("admin", "orders:read")))
+ * ```
+ */
+export const ability = (
+  ...anyAbilities: string[]
+): Middleware<CurrentAccessToken, ForbiddenError> => ({
+  name: `ability:${anyAbilities.join(",")}`,
+  apply: <A, E, R>(handler: Effect.Effect<A, E, R>) =>
+    Effect.gen(function* () {
+      const token = yield* CurrentAccessToken;
+
+      // Wildcard grants all abilities
+      if (token.abilities.includes("*")) {
+        return yield* handler;
+      }
+
+      // Check if ANY ability is present
+      const hasAny = anyAbilities.some(
+        (ability) => token.abilities.includes(ability)
+      );
+
+      if (!hasAny) {
+        return yield* Effect.fail(
+          ForbiddenError.missingAbility(`one of: ${anyAbilities.join(", ")}`)
+        );
+      }
+
+      return yield* handler;
+    }),
+});
+```
+
+#### Mobile App Authentication Flow
+
+```typescript
+// Example: Mobile app token endpoint
+
+Route.post("/api/tokens")
+  .validate({
+    body: Schema.Struct({
+      email: Schema.String,
+      password: Schema.String,
+      device_name: Schema.String,
+    }),
+  })
+  .handle((req) =>
+    Effect.gen(function* () {
+      const { email, password, device_name } = req.body;
+
+      // Authenticate user
+      const user = yield* UserRepository.findByEmail(email);
+      if (Option.isNone(user)) {
+        return yield* Effect.fail(InvalidCredentialsError.make());
+      }
+
+      const passwordValid = yield* PasswordService.verify(
+        password,
+        user.value.passwordHash
+      );
+      if (!passwordValid) {
+        return yield* Effect.fail(InvalidCredentialsError.make());
+      }
+
+      // Create token with HasApiTokens mixin
+      const userWithTokens = withApiTokens(user.value);
+      const { plainTextToken } = yield* userWithTokens.createToken(
+        device_name,
+        ["*"]  // Full access, or specify abilities
+      );
+
+      return Response.json({ token: plainTextToken });
+    })
+  );
+
+// Using the token
+// Authorization: Bearer {token_id}|{plain_text_token}
+```
+
+#### Token Revocation
+
+```typescript
+// Revoke current token (logout)
+Route.post("/api/tokens/revoke")
+  .pipe(Route.use(requireAuth))
+  .handle((req) =>
+    Effect.gen(function* () {
+      const token = yield* CurrentAccessToken;
+      const tokenStore = yield* PersonalAccessTokenStore;
+      yield* tokenStore.delete(token.id);
+      return Response.noContent();
+    })
+  );
+
+// Revoke all tokens (logout everywhere)
+Route.post("/api/tokens/revoke-all")
+  .pipe(Route.use(requireAuth))
+  .handle((req) =>
+    Effect.gen(function* () {
+      const user = yield* AuthService.user();
+      const userWithTokens = withApiTokens(user);
+      const count = yield* userWithTokens.revokeAllTokens();
+      return Response.json({ revoked: count });
+    })
+  );
+```
+
+### 3.9 SPA Authentication (Cookie-Based)
+
+For first-party SPAs, use cookie-based sessions with CSRF protection:
+
+```typescript
+// CSRF cookie endpoint (call before login)
+Route.get("/api/csrf-cookie")
+  .handle(() =>
+    Effect.gen(function* () {
+      const csrfToken = yield* CsrfService.generate();
+      return Response.noContent()
+        .pipe(Response.setCookie("XSRF-TOKEN", csrfToken, {
+          httpOnly: false,  // JS needs to read this
+          secure: true,
+          sameSite: "lax",
+        }));
+    })
+  );
+
+// SPA login (returns session cookie)
+Route.post("/api/login")
+  .pipe(Route.use(verifyCsrf))
+  .validate({ body: CredentialsSchema })
+  .handle((req) =>
+    Effect.gen(function* () {
+      const session = yield* AuthService.attempt(req.body);
+      return Response.json({ user: session.user })
+        .pipe(Response.setCookie("session", session.token, {
+          httpOnly: true,
+          secure: true,
+          sameSite: "lax",
+        }));
+    })
+  );
+```
+
+```typescript
+// Frontend (Axios example)
+axios.defaults.withCredentials = true;
+axios.defaults.withXSRFToken = true;
+
+// Get CSRF cookie first
+await axios.get('/api/csrf-cookie');
+
+// Then login
+await axios.post('/api/login', { email, password });
+
+// Subsequent requests automatically include session cookie
+const user = await axios.get('/api/user');
+```
+
+### 3.10 Testing Utilities
+
+```typescript
+// libs/auth/testing/helpers.ts
+
+/**
+ * Authenticate as a user in tests (Sanctum-style)
+ *
+ * @example
+ * ```typescript
+ * test("can list todos", () =>
+ *   Effect.gen(function* () {
+ *     yield* Sanctum.actingAs(testUser, ["todos:read"]);
+ *
+ *     const response = yield* TestClient.get("/api/todos");
+ *     expect(response.status).toBe(200);
+ *   })
+ * );
+ * ```
+ */
+export const Sanctum = {
+  actingAs: (
+    user: AuthUser,
+    abilities: ReadonlyArray<string> = ["*"]
+  ): Effect.Effect<void, never, CurrentUser | CurrentAccessToken> =>
+    Effect.gen(function* () {
+      // Create mock token
+      const mockToken: PersonalAccessToken = {
+        id: TokenId("test-token"),
+        userId: user.id,
+        name: "test-token",
+        token: "hashed",
+        abilities,
+        lastUsedAt: Option.none(),
+        expiresAt: Option.none(),
+        createdAt: new Date(),
+      };
+
+      // Provide to context
+      yield* Effect.provideService(CurrentUser, user);
+      yield* Effect.provideService(CurrentAccessToken, mockToken);
+    }),
+
+  /**
+   * Create a test layer with authenticated user
+   */
+  actingAsLayer: (
+    user: AuthUser,
+    abilities: ReadonlyArray<string> = ["*"]
+  ): Layer.Layer<CurrentUser | CurrentAccessToken> =>
+    Layer.succeed(CurrentUser, user).pipe(
+      Layer.merge(
+        Layer.succeed(CurrentAccessToken, {
+          id: TokenId("test-token"),
+          userId: user.id,
+          name: "test-token",
+          token: "hashed",
+          abilities,
+          lastUsedAt: Option.none(),
+          expiresAt: Option.none(),
+          createdAt: new Date(),
+        })
+      )
+    ),
+};
+
+// Usage in tests
+describe("TodoController", () => {
+  const testUser = { id: UserId("1"), email: "test@example.com", ... };
+
+  it("allows reading todos with correct ability", () =>
+    pipe(
+      TestClient.get("/api/todos"),
+      Effect.provide(Sanctum.actingAsLayer(testUser, ["todos:read"])),
+      Effect.flatMap((response) => {
+        expect(response.status).toBe(200);
+        return Effect.void;
+      }),
+      Effect.runPromise
+    )
+  );
+
+  it("forbids reading todos without ability", () =>
+    pipe(
+      TestClient.get("/api/todos"),
+      Effect.provide(Sanctum.actingAsLayer(testUser, ["other:ability"])),
+      Effect.flatMap((response) => {
+        expect(response.status).toBe(403);
+        return Effect.void;
+      }),
+      Effect.runPromise
+    )
+  );
+});
 ```
 
 ---

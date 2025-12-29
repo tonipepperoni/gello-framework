@@ -1,0 +1,772 @@
+---
+title: Mail
+description: Laravel 4.2-inspired mail system with hexagonal DDD architecture built on Effect
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Steps, Step } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+Gello's mail system provides a unified API for sending emails through various providers. Inspired by Laravel 4.2's elegant mail API, it features a fluent Mailable abstraction, React Email templating, and swappable drivers for maximum flexibility.
+
+<Callout type="info" title="Effect-Native">
+Mail uses `Context.Tag` for services, `Layer` for dependency injection,
+and Effect primitives for typed errors — fully functional and composable.
+</Callout>
+
+## Getting Started
+
+<Steps>
+<Step>
+### Install Dependencies
+
+```bash
+pnpm add @gello/mail-core @gello/mail-drivers @gello/mail-templates
+```
+</Step>
+
+<Step>
+### Create a Simple Email
+
+Send a quick email using the Mail service:
+
+```typescript
+import { Effect } from "effect"
+import { MailTag } from "@gello/mail-core"
+
+export const sendWelcomeEmail = (email: string, name: string) =>
+  Effect.gen(function* () {
+    const mail = yield* MailTag
+
+    yield* mail.sendRaw(
+      email,
+      "Welcome to Our Platform!",
+      {
+        text: `Hi ${name}, welcome aboard!`,
+        html: `<h1>Hi ${name}</h1><p>Welcome aboard!</p>`,
+      }
+    )
+  })
+```
+</Step>
+
+<Step>
+### Create a Mailable
+
+For more complex emails, create a Mailable class:
+
+```typescript
+// src/mail/WelcomeEmail.ts
+import { Effect } from "effect"
+import { BaseMailable, type Content } from "@gello/mail-core"
+
+interface WelcomeEmailData {
+  name: string
+  activationUrl: string
+}
+
+export class WelcomeEmail extends BaseMailable<WelcomeEmailData> {
+  getSubject(): string {
+    return "Welcome to Our Platform!"
+  }
+
+  getContent(data: WelcomeEmailData): Effect.Effect<Content> {
+    return Effect.succeed({
+      subject: this.getSubject(),
+      html: `
+        <h1>Welcome, ${data.name}!</h1>
+        <p>Thanks for joining us. Click below to activate your account:</p>
+        <a href="${data.activationUrl}">Activate Account</a>
+      `,
+      text: `Welcome, ${data.name}! Activate: ${data.activationUrl}`,
+    })
+  }
+}
+
+// Usage
+const sendWelcome = Effect.gen(function* () {
+  const mail = yield* MailTag
+
+  const mailable = new WelcomeEmail()
+    .to("user@example.com")
+    .from("hello@myapp.com", "My App")
+    .with({ name: "Alice", activationUrl: "https://..." })
+
+  yield* mail.send(mailable)
+})
+```
+</Step>
+
+<Step>
+### Wire Up the Layers
+
+<Tabs items={['Development', 'Production']}>
+<Tab value="Development">
+```typescript
+import { Effect, Layer, pipe } from "effect"
+import { MailTag, MailServiceLive } from "@gello/mail-core"
+import { LogDriverLive } from "@gello/mail-drivers"
+
+// Log driver prints emails to console
+const DevMailLayer = pipe(
+  MailServiceLive,
+  Layer.provide(LogDriverLive)
+)
+
+const program = Effect.gen(function* () {
+  const mail = yield* MailTag
+  yield* mail.sendRaw("test@example.com", "Hello", "Test email")
+})
+
+Effect.runPromise(program.pipe(Effect.provide(DevMailLayer)))
+```
+</Tab>
+<Tab value="Production">
+```typescript
+import { Effect, Layer, pipe } from "effect"
+import { MailTag, MailServiceLive } from "@gello/mail-core"
+import { SmtpDriverLive } from "@gello/mail-drivers"
+
+// SMTP driver for production
+const ProdMailLayer = pipe(
+  MailServiceLive,
+  Layer.provide(SmtpDriverLive({
+    host: process.env.SMTP_HOST!,
+    port: Number(process.env.SMTP_PORT ?? 587),
+    secure: true,
+    auth: {
+      user: process.env.SMTP_USER!,
+      pass: process.env.SMTP_PASS!,
+    },
+  }))
+)
+
+Effect.runPromise(program.pipe(Effect.provide(ProdMailLayer)))
+```
+</Tab>
+</Tabs>
+</Step>
+</Steps>
+
+## Domain Types
+
+### Core Types
+
+```typescript
+// Message identifier (branded string)
+type MessageId = Brand.Branded<string, "MessageId">
+
+// Email address (branded string with validation)
+type EmailAddress = Brand.Branded<string, "EmailAddress">
+
+// Mail priority levels
+type MailPriority = "low" | "normal" | "high"
+
+// Mail delivery status
+type MailStatus = "pending" | "sent" | "delivered" | "failed" | "bounced"
+```
+
+### Address
+
+```typescript
+interface Address {
+  readonly email: EmailAddress
+  readonly name?: string
+}
+
+// Create addresses
+const addr1 = Address.make("user@example.com")
+const addr2 = Address.make("user@example.com", "John Doe")
+const addr3 = Address.parse("John Doe <john@example.com>")
+```
+
+### Message
+
+```typescript
+interface Message {
+  readonly id: MessageId
+  readonly envelope: Envelope
+  readonly content: Content
+  readonly attachments: ReadonlyArray<Attachment>
+  readonly headers: ReadonlyMap<string, string>
+  readonly priority: MailPriority
+  readonly tags?: ReadonlyArray<string>
+  readonly metadata?: Record<string, unknown>
+  readonly createdAt: Date
+}
+
+interface Envelope {
+  readonly from: Address
+  readonly to: ReadonlyArray<Address>
+  readonly cc?: ReadonlyArray<Address>
+  readonly bcc?: ReadonlyArray<Address>
+  readonly replyTo?: Address
+}
+
+interface Content {
+  readonly subject: string
+  readonly html?: string
+  readonly text?: string
+  readonly template?: TemplateRef
+}
+```
+
+### Attachments
+
+```typescript
+// Three types of attachments
+type Attachment =
+  | FileAttachment    // From file path
+  | DataAttachment    // From buffer/string
+  | UrlAttachment     // From remote URL
+
+// Create attachments
+const file = Attachment.fromPath("/path/to/file.pdf")
+const data = Attachment.fromData(buffer, "report.pdf", "application/pdf")
+const url = Attachment.fromUrl("https://example.com/doc.pdf", "doc.pdf")
+```
+
+## Mailable API
+
+The fluent Mailable API makes composing emails intuitive:
+
+```typescript
+import { BaseMailable } from "@gello/mail-core"
+
+class OrderConfirmation extends BaseMailable<OrderData> {
+  getSubject() {
+    return `Order #${this.getData()?.orderId} Confirmed`
+  }
+
+  getContent(data: OrderData) {
+    return Effect.succeed({
+      subject: this.getSubject(),
+      template: { name: "order-confirmation", data },
+    })
+  }
+}
+
+// Fluent API
+const email = new OrderConfirmation()
+  .to("customer@example.com")
+  .to(["cc1@example.com", "cc2@example.com"])  // Multiple recipients
+  .from("orders@myshop.com", "My Shop")
+  .replyTo("support@myshop.com")
+  .cc("manager@myshop.com")
+  .bcc("archive@myshop.com")
+  .subject("Your Order is Confirmed!")  // Override subject
+  .priority("high")
+  .tag("order", "confirmation")
+  .header("X-Order-ID", "12345")
+  .attach(Attachment.fromPath("./invoice.pdf"))
+  .with({ orderId: "12345", items: [...] })
+```
+
+### Quick Email Factory
+
+For simple emails without a dedicated class:
+
+```typescript
+import { createSimpleMailable } from "@gello/mail-core"
+
+const quickEmail = createSimpleMailable({
+  subject: "Quick Update",
+  html: "<p>This is a quick update.</p>",
+  text: "This is a quick update.",
+})
+  .to("user@example.com")
+  .from("noreply@myapp.com")
+
+yield* mail.send(quickEmail)
+```
+
+### Template-Based Email
+
+```typescript
+import { createTemplateMailable } from "@gello/mail-core"
+
+const templateEmail = createTemplateMailable({
+  subject: "Your Weekly Report",
+  template: "weekly-report",
+  data: { userId: "123", weekStart: "2024-01-01" },
+})
+  .to("user@example.com")
+
+yield* mail.send(templateEmail)
+```
+
+## Drivers
+
+Choose the driver that fits your environment.
+
+### Log Driver
+
+Prints emails to the console. Perfect for development.
+
+```typescript
+import { LogDriverLive } from "@gello/mail-drivers"
+
+const DevLayer = Layer.provide(MailServiceLive, LogDriverLive)
+```
+
+Output:
+```
+============================================================
+MAIL LOG
+============================================================
+Message ID: msg_abc123
+From: "My App" <hello@myapp.com>
+To: user@example.com
+Subject: Welcome!
+Priority: normal
+------------------------------------------------------------
+TEXT CONTENT:
+Welcome to our platform!
+============================================================
+```
+
+<Callout type="warn" title="Development Only">
+Log driver doesn't actually send emails. Use for local development only.
+</Callout>
+
+### Array Driver
+
+Stores emails in memory with assertion helpers. Perfect for testing.
+
+```typescript
+import { makeArrayDriver, ArrayDriverLive } from "@gello/mail-drivers"
+
+// Option 1: Use the layer directly
+const TestLayer = Layer.provide(MailServiceLive, ArrayDriverLive)
+
+// Option 2: Get direct access for assertions
+const testDriver = yield* makeArrayDriver()
+
+// Send some emails...
+yield* mail.sendRaw("test@example.com", "Test", "Hello")
+
+// Assert on sent emails
+yield* testDriver.assertSentCount(1)
+yield* testDriver.assertSentTo("test@example.com")
+yield* testDriver.assertSentWithSubject("Test")
+yield* testDriver.assertNothingSent()  // Fails if emails were sent
+
+// Get all sent messages
+const sent = yield* testDriver.getSent()
+const lastSent = yield* testDriver.getLastSent()
+
+// Find specific messages
+const matches = yield* testDriver.findMessages(
+  (msg) => msg.content.subject.includes("Welcome")
+)
+
+// Clear for next test
+yield* testDriver.clear()
+```
+
+### SMTP Driver (Coming Soon)
+
+Production-ready SMTP transport.
+
+```typescript
+import { SmtpDriverLive } from "@gello/mail-drivers"
+
+const ProdLayer = Layer.provide(
+  MailServiceLive,
+  SmtpDriverLive({
+    host: "smtp.example.com",
+    port: 587,
+    secure: true,
+    auth: {
+      user: "apikey",
+      pass: process.env.SMTP_PASSWORD!,
+    },
+  })
+)
+```
+
+### Provider Drivers (Planned)
+
+Future support for popular email providers:
+
+- **Resend** - Modern email API
+- **SendGrid** - Twilio's email service
+- **Postmark** - Transactional email
+- **Mailgun** - Email for developers
+- **AWS SES** - Amazon Simple Email Service
+
+## React Email Templates
+
+Build beautiful, responsive emails with React components.
+
+### Theme System
+
+Define a consistent theme for all your emails:
+
+```typescript
+import { defineMailTheme } from "@gello/mail-templates"
+
+export const mailTheme = defineMailTheme({
+  brand: {
+    name: "My App",
+    logo: "https://myapp.com/logo.png",
+    logoWidth: 120,
+    website: "https://myapp.com",
+  },
+  colors: {
+    primary: "#8b5cf6",    // Purple
+    secondary: "#64748b",
+    background: "#ffffff",
+    surface: "#f8fafc",
+    text: "#1e293b",
+    muted: "#94a3b8",
+    border: "#e2e8f0",
+  },
+  fonts: {
+    heading: "Inter, -apple-system, sans-serif",
+    body: "Inter, -apple-system, sans-serif",
+    mono: "JetBrains Mono, monospace",
+  },
+  layout: {
+    maxWidth: 600,
+    padding: 24,
+    borderRadius: 8,
+  },
+  footer: {
+    company: "My App Inc.",
+    address: "123 Main St, City, Country",
+    unsubscribeUrl: "https://myapp.com/unsubscribe",
+    socialLinks: {
+      twitter: "https://twitter.com/myapp",
+      github: "https://github.com/myapp",
+    },
+  },
+})
+```
+
+### Pre-Built Components
+
+Use the component library to build emails quickly:
+
+```tsx
+import {
+  BaseLayout,
+  Heading,
+  Text,
+  Button,
+  Card,
+  Divider,
+  Spacer,
+  Alert,
+  Badge,
+  Link,
+  Code,
+} from "@gello/mail-templates"
+
+interface WelcomeEmailProps {
+  name: string
+  activationUrl: string
+}
+
+export function WelcomeEmailTemplate({ name, activationUrl }: WelcomeEmailProps) {
+  return (
+    <BaseLayout theme={mailTheme} preview={`Welcome, ${name}!`}>
+      <Heading>Welcome to My App!</Heading>
+
+      <Text>Hi {name},</Text>
+
+      <Text>
+        Thanks for signing up. We're excited to have you on board.
+        Click the button below to activate your account:
+      </Text>
+
+      <Spacer size="md" />
+
+      <Button href={activationUrl} variant="primary" size="lg" fullWidth>
+        Activate Your Account
+      </Button>
+
+      <Spacer size="lg" />
+
+      <Alert type="info" title="Need help?">
+        If you have any questions, just reply to this email or visit our{" "}
+        <Link href="https://myapp.com/help">Help Center</Link>.
+      </Alert>
+
+      <Divider />
+
+      <Card>
+        <Heading as="h3">What's Next?</Heading>
+        <Text>
+          Your activation code is: <Code>ABC123</Code>
+        </Text>
+        <Badge color="success">New User</Badge>
+      </Card>
+    </BaseLayout>
+  )
+}
+```
+
+### Component Reference
+
+| Component | Props | Description |
+|-----------|-------|-------------|
+| `BaseLayout` | `theme`, `preview`, `children` | Main email wrapper with header/footer |
+| `Heading` | `as`, `style` | h1-h6 headings |
+| `Text` | `muted`, `small`, `center` | Paragraph text |
+| `Button` | `href`, `variant`, `size`, `fullWidth` | Call-to-action button |
+| `Link` | `href` | Styled anchor |
+| `Card` | `style` | Elevated card container |
+| `Section` | `padding` | Content section |
+| `Divider` | `style` | Horizontal rule |
+| `Spacer` | `size` (xs/sm/md/lg/xl) | Vertical spacing |
+| `Alert` | `type`, `title` | Info/success/warning/error callout |
+| `Badge` | `color` | Status badge |
+| `Code` | `style` | Inline code |
+
+### Register Templates
+
+Register templates for use with the template engine:
+
+```typescript
+import { registerTemplate, registerTemplates } from "@gello/mail-templates"
+import { WelcomeEmailTemplate } from "./templates/WelcomeEmail"
+import { OrderConfirmationTemplate } from "./templates/OrderConfirmation"
+
+// Register individually
+registerTemplate("welcome", WelcomeEmailTemplate)
+
+// Or register multiple
+registerTemplates({
+  welcome: WelcomeEmailTemplate,
+  "order-confirmation": OrderConfirmationTemplate,
+  "password-reset": PasswordResetTemplate,
+})
+```
+
+### Render Directly
+
+Render React Email components to HTML/text:
+
+```typescript
+import { renderDirect, renderElement } from "@gello/mail-templates"
+
+// Render a component with props
+const result = yield* renderDirect(WelcomeEmailTemplate, {
+  name: "Alice",
+  activationUrl: "https://...",
+})
+
+console.log(result.html)  // Full HTML string
+console.log(result.text)  // Plain text version
+
+// Or render a React element
+const element = <WelcomeEmailTemplate name="Alice" activationUrl="..." />
+const result = yield* renderElement(element)
+```
+
+## Error Handling
+
+All operations return typed errors:
+
+```typescript
+import {
+  MailError,
+  MailConnectionError,
+  MailValidationError,
+  MailDeliveryError,
+  TemplateError,
+  TemplateNotFoundError,
+} from "@gello/mail-core"
+
+const sendEmail = Effect.gen(function* () {
+  const mail = yield* MailTag
+
+  yield* mail.send(mailable).pipe(
+    Effect.catchTags({
+      MailValidationError: (e) =>
+        Effect.logError(`Invalid email: ${e.field} - ${e.message}`),
+
+      MailDeliveryError: (e) =>
+        Effect.logError(`Delivery failed: ${e.provider} - ${e.providerError}`),
+
+      TemplateNotFoundError: (e) =>
+        Effect.logError(`Template not found: ${e.template}`),
+
+      MailError: (e) =>
+        Effect.logError(`Mail error: ${e.message}`),
+    })
+  )
+})
+```
+
+## Testing
+
+Use the Array driver for testing:
+
+```typescript
+import { describe, it, expect } from "vitest"
+import { Effect, Layer } from "effect"
+import { MailTag, MailServiceLive } from "@gello/mail-core"
+import { makeArrayDriver } from "@gello/mail-drivers"
+
+describe("UserService", () => {
+  it("sends welcome email on registration", async () => {
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const testDriver = yield* makeArrayDriver()
+        const testLayer = Layer.succeed(MailDriverTag, testDriver)
+        const mailLayer = Layer.provide(MailServiceLive, testLayer)
+
+        // Run the code under test
+        yield* registerUser({
+          email: "new@example.com",
+          name: "New User",
+        }).pipe(Effect.provide(mailLayer))
+
+        // Assertions
+        yield* testDriver.assertSentCount(1)
+        yield* testDriver.assertSentTo("new@example.com")
+        yield* testDriver.assertSentWithSubject("Welcome")
+
+        const sent = yield* testDriver.getSent()
+        expect(sent[0].content.html).toContain("New User")
+      })
+    )
+  })
+
+  it("handles delivery failures gracefully", async () => {
+    // Create a driver that fails
+    const failingDriver = {
+      name: "failing",
+      send: () => Effect.fail(new MailDeliveryError({
+        message: "Connection refused",
+        messageId: MessageId("test"),
+        provider: "test",
+      })),
+      sendRaw: () => Effect.fail(new MailError({ message: "Failed" })),
+      verify: () => Effect.succeed(false),
+    }
+
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const result = yield* sendWelcome("user@example.com").pipe(
+          Effect.either
+        )
+
+        expect(Either.isLeft(result)).toBe(true)
+      }).pipe(
+        Effect.provide(Layer.succeed(MailDriverTag, failingDriver)),
+        Effect.provide(MailServiceLive)
+      )
+    )
+  })
+})
+```
+
+## Configuration
+
+### Environment Variables
+
+```bash
+# Mail driver selection
+MAIL_DRIVER=smtp  # smtp | log | array | resend | sendgrid
+
+# SMTP configuration
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_SECURE=true
+SMTP_USER=apikey
+SMTP_PASS=your-password
+
+# Default sender
+MAIL_FROM_ADDRESS=noreply@myapp.com
+MAIL_FROM_NAME="My App"
+
+# Provider-specific (future)
+RESEND_API_KEY=re_xxx
+SENDGRID_API_KEY=SG.xxx
+POSTMARK_API_KEY=xxx
+```
+
+## Mail Service API
+
+| Method | Description |
+|--------|-------------|
+| `send(mailable)` | Send a Mailable instance |
+| `sendRaw(to, subject, content, options?)` | Send a quick email |
+| `driver()` | Get the current driver instance |
+| `mailer(name)` | Get a specific mailer by name (multi-driver) |
+
+## Complete Example
+
+```typescript
+import { Effect, Layer, pipe } from "effect"
+import { MailTag, MailServiceLive, BaseMailable, type Content } from "@gello/mail-core"
+import { LogDriverLive } from "@gello/mail-drivers"
+import {
+  defineMailTheme,
+  registerTemplate,
+  ReactEmailEngineLive,
+  BaseLayout,
+  Heading,
+  Text,
+  Button,
+} from "@gello/mail-templates"
+
+// 1. Define theme
+const theme = defineMailTheme({
+  brand: { name: "My App" },
+  colors: { primary: "#3b82f6" },
+})
+
+// 2. Create template component
+function WelcomeTemplate({ name, url }: { name: string; url: string }) {
+  return (
+    <BaseLayout theme={theme}>
+      <Heading>Welcome, {name}!</Heading>
+      <Text>Click below to get started:</Text>
+      <Button href={url}>Get Started</Button>
+    </BaseLayout>
+  )
+}
+
+// 3. Register template
+registerTemplate("welcome", WelcomeTemplate)
+
+// 4. Create Mailable
+class WelcomeMail extends BaseMailable<{ name: string; url: string }> {
+  getSubject() {
+    return "Welcome to My App!"
+  }
+
+  getContent(data: { name: string; url: string }) {
+    return Effect.succeed({
+      subject: this.getSubject(),
+      template: { name: "welcome", data },
+    })
+  }
+}
+
+// 5. Compose layers
+const MainLayer = pipe(
+  MailServiceLive,
+  Layer.provide(LogDriverLive),
+  Layer.provide(ReactEmailEngineLive)
+)
+
+// 6. Send email
+const program = Effect.gen(function* () {
+  const mail = yield* MailTag
+
+  const welcome = new WelcomeMail()
+    .to("alice@example.com")
+    .from("hello@myapp.com")
+    .with({ name: "Alice", url: "https://myapp.com/start" })
+
+  yield* mail.send(welcome)
+  yield* Effect.log("Welcome email sent!")
+})
+
+Effect.runPromise(program.pipe(Effect.provide(MainLayer)))
+```

@@ -16,6 +16,7 @@
     "---Features---",
     "database",
     "queues",
+    "mail",
     "caching",
     "logger",
     "time",

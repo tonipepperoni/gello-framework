@@ -29,6 +29,7 @@ export const pageTree: PageTree.Root = {
     { type: 'page', name: 'Database', url: '/docs/database' },
     { type: 'page', name: 'Storage', url: '/docs/storage' },
     { type: 'page', name: 'Queues', url: '/docs/queues' },
+    { type: 'page', name: 'Mail', url: '/docs/mail' },
     { type: 'page', name: 'Caching', url: '/docs/caching' },
     { type: 'page', name: 'Logger', url: '/docs/logger' },
     { type: 'page', name: 'Time Utilities', url: '/docs/time' },

@@ -1,0 +1,183 @@
+---
+title: Routing
+description: Declarative route definitions with type-safe params and automatic context injection
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+## Route Builders
+
+Gello provides a fluent route builder API that creates typed route definitions.
+Routes are just data — arrays of route objects that get registered with your app.
+
+```typescript
+import { route } from "@gello/core-adapters-node"
+
+// Define routes as data
+export const routes = [
+  route.get("/", homeHandler),
+  route.get("/health", healthCheck),
+  route.get("/users", listUsers),
+  route.get("/users/:id", getUser),
+  route.post("/users", createUser),
+  route.patch("/users/:id", updateUser),
+  route.delete("/users/:id", deleteUser),
+] as const
+```
+
+## Route Parameters
+
+Route parameters are automatically extracted and injected into your handler's context.
+Use the `getParam` helper to access them type-safely.
+
+```typescript
+import { getParam } from "@gello/core-domain-routing"
+
+const getUser = Effect.gen(function* () {
+  // Extract :id from the path
+  const id = yield* getParam("id")
+
+  const repo = yield* UserRepo
+  const user = yield* repo.findById(id)
+
+  if (!user) {
+    return HttpServerResponse.empty({ status: 404 })
+  }
+
+  return HttpServerResponse.json(user)
+})
+```
+
+## Query Parameters
+
+Query parameters are also available via context. Use typed helpers for common conversions.
+
+```typescript
+import {
+  getQuery,
+  getQueryAsNumber,
+  getQueryAsBoolean
+} from "@gello/core-domain-routing"
+
+const listUsers = Effect.gen(function* () {
+  // ?page=2&limit=20&active=true
+  const page = yield* getQueryAsNumber("page", 1)      // defaults to 1
+  const limit = yield* getQueryAsNumber("limit", 20)   // defaults to 20
+  const active = yield* getQueryAsBoolean("active")    // Option<boolean>
+
+  const repo = yield* UserRepo
+  const users = yield* repo.list({ page, limit, active })
+
+  return HttpServerResponse.json(users)
+})
+```
+
+## Registering Routes
+
+Routes are registered with your app using the `routes()` method.
+The app automatically injects `RouteParams`, `QueryParams`,
+and `HttpServerRequest` into each handler's context.
+
+```typescript
+import { createApp, runApp } from "@gello/core-adapters-node"
+import { routes } from "./routes"
+
+const app = createApp({ port: 3000 })
+  .use(cors({ origins: "*" }))
+  .routes(routes)
+
+runApp(app, AppLayer)
+```
+
+## Route Groups
+
+Organize related routes by defining them in separate files and combining them.
+
+```typescript
+// routes/users.ts
+export const userRoutes = [
+  route.get("/users", listUsers),
+  route.get("/users/:id", getUser),
+  route.post("/users", createUser),
+] as const
+
+// routes/posts.ts
+export const postRoutes = [
+  route.get("/posts", listPosts),
+  route.get("/posts/:id", getPost),
+] as const
+
+// routes/index.ts
+export const routes = [
+  ...apiRoutes,
+  ...userRoutes,
+  ...postRoutes,
+] as const
+```
+
+## Middleware per Route
+
+Apply middleware to specific routes by wrapping handlers.
+
+```typescript
+const withAuth = <R>(handler: Effect.Effect<HttpServerResponse, RouteError, R>) =>
+  pipe(
+    Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest
+      const token = request.headers.authorization?.replace("Bearer ", "")
+
+      if (!token) {
+        return HttpServerResponse.empty({ status: 401 })
+      }
+
+      const user = yield* verifyToken(token)
+      return yield* handler.pipe(Effect.provideService(CurrentUser, user))
+    })
+  )
+
+export const routes = [
+  route.get("/public", publicHandler),
+  route.get("/me", withAuth(getProfile)),
+  route.post("/settings", withAuth(updateSettings)),
+] as const
+```
+
+## Error Handling
+
+Wrap routes with error handlers to convert domain errors to HTTP responses.
+
+```typescript
+const handleError = (error: RouteError) =>
+  Match.value(error).pipe(
+    Match.tag("NotFoundError", (e) =>
+      HttpServerResponse.json({ error: e.message }, { status: 404 })
+    ),
+    Match.tag("ValidationError", (e) =>
+      HttpServerResponse.json({ error: e.message }, { status: 400 })
+    ),
+    Match.orElse(() =>
+      HttpServerResponse.json({ error: "Internal error" }, { status: 500 })
+    )
+  )
+
+const handle = <R>(handler: Effect.Effect<HttpServerResponse, RouteError, R>) =>
+  pipe(handler, Effect.catchAll(handleError))
+
+export const routes = [
+  route.get("/users/:id", handle(getUser)),
+  route.post("/users", handle(createUser)),
+] as const
+```
+
+## CLI: List Routes
+
+Use the Gello CLI to view all registered routes in your application.
+
+```bash
+pnpm gello route:list
+```
+
+<Callout type="info">
+This displays a beautiful TUI with all routes, their methods, paths, and handlers —
+grouped by path prefix with color-coded HTTP methods.
+</Callout>

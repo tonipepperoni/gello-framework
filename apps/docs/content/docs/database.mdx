@@ -1,0 +1,199 @@
+---
+title: Database
+description: Type-safe database access with Drizzle ORM and Effect's resource management
+---
+
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+## Setup
+
+<Tabs items={['pnpm', 'npm', 'yarn']}>
+  <Tab value="pnpm">
+    ```bash
+    pnpm add drizzle-orm pg
+    pnpm add -D drizzle-kit @types/pg
+    ```
+  </Tab>
+  <Tab value="npm">
+    ```bash
+    npm install drizzle-orm pg
+    npm install -D drizzle-kit @types/pg
+    ```
+  </Tab>
+  <Tab value="yarn">
+    ```bash
+    yarn add drizzle-orm pg
+    yarn add -D drizzle-kit @types/pg
+    ```
+  </Tab>
+</Tabs>
+
+## Connection Pool Layer
+
+The database pool is a scoped resource — acquired on startup, released on shutdown.
+
+```typescript
+import { Pool } from "pg"
+import { Context, Effect, Layer } from "effect"
+
+class PgPool extends Context.Tag("PgPool")<PgPool, Pool>() {}
+
+const PgPoolLive = Layer.scoped(
+  PgPool,
+  Effect.acquireRelease(
+    Effect.gen(function* () {
+      const cfg = yield* Config
+      const pool = new Pool({ connectionString: cfg.DATABASE_URL })
+
+      // Test connection
+      const client = yield* Effect.tryPromise(() => pool.connect())
+      client.release()
+
+      yield* Effect.log("Database connected")
+      return pool
+    }),
+    (pool) =>
+      Effect.tryPromise(() => pool.end()).pipe(
+        Effect.tap(() => Effect.log("Database disconnected")),
+        Effect.orDie
+      )
+  )
+).pipe(Layer.provide(ConfigLive))
+```
+
+## Drizzle Layer
+
+```typescript
+import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres"
+import * as schema from "./schema"
+
+class Db extends Context.Tag("Db")<
+  Db,
+  NodePgDatabase<typeof schema>
+>() {}
+
+const DbLive = Layer.effect(
+  Db,
+  Effect.gen(function* () {
+    const pool = yield* PgPool
+    return drizzle(pool, { schema })
+  })
+).pipe(Layer.provide(PgPoolLive))
+```
+
+## Schema Definition
+
+```typescript
+// src/lib/db/schema.ts
+import { pgTable, text, timestamp, boolean } from "drizzle-orm/pg-core"
+
+export const users = pgTable("users", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+})
+
+export const posts = pgTable("posts", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  content: text("content"),
+  published: boolean("published").default(false),
+  authorId: text("author_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull()
+})
+```
+
+## Repository Pattern
+
+```typescript
+import { eq } from "drizzle-orm"
+import { users } from "../lib/db/schema"
+
+export const UserRepoLive = Layer.effect(
+  UserRepo,
+  Effect.gen(function* () {
+    const db = yield* Db
+
+    return {
+      findById: (id) =>
+        Effect.tryPromise(async () => {
+          const [user] = await db.select().from(users).where(eq(users.id, id))
+          return user ?? null
+        }),
+
+      create: (data) =>
+        Effect.tryPromise(async () => {
+          const id = crypto.randomUUID()
+          const [user] = await db.insert(users).values({ id, ...data }).returning()
+          return user
+        }),
+
+      list: ({ page, limit }) =>
+        Effect.tryPromise(() =>
+          db.select().from(users).limit(limit).offset((page - 1) * limit)
+        )
+    }
+  })
+)
+```
+
+## Transactions
+
+```typescript
+const transferFunds = (fromId: string, toId: string, amount: number) =>
+  Effect.gen(function* () {
+    const db = yield* Db
+
+    return yield* Effect.tryPromise(() =>
+      db.transaction(async (tx) => {
+        await tx.update(accounts)
+          .set({ balance: sql`balance - ${amount}` })
+          .where(eq(accounts.id, fromId))
+
+        await tx.update(accounts)
+          .set({ balance: sql`balance + ${amount}` })
+          .where(eq(accounts.id, toId))
+
+        return { success: true }
+      })
+    )
+  })
+```
+
+## Queries with Joins
+
+```typescript
+const getPostWithAuthor = (postId: string) =>
+  Effect.gen(function* () {
+    const db = yield* Db
+
+    const result = yield* Effect.tryPromise(() =>
+      db.query.posts.findFirst({
+        where: eq(posts.id, postId),
+        with: {
+          author: true
+        }
+      })
+    )
+
+    return result
+  })
+```
+
+## Testing with Test Database
+
+```typescript
+// Use a test database
+const ConfigTest = Layer.succeed(Config, {
+  DATABASE_URL: "postgres://localhost/myapp_test",
+  // ...
+})
+
+// Or use an in-memory mock
+const DbTest = Layer.succeed(Db, {
+  select: () => ({ from: () => ({ where: () => Promise.resolve([]) }) }),
+  insert: () => ({ values: () => ({ returning: () => Promise.resolve([]) }) })
+} as unknown as NodePgDatabase)
+```

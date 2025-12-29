@@ -1,0 +1,160 @@
+---
+title: CLI
+description: Gello CLI — create projects and manage your application
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+## Installation
+
+The Gello CLI is available as an npm package. Use it directly with npx:
+
+```bash
+npx gello <command>
+```
+
+Or install globally:
+
+```bash
+npm install -g gello
+gello <command>
+```
+
+## Available Commands
+
+### new
+
+Create a new Gello project with a complete starter template:
+
+```bash
+# Create a new project
+npx gello new my-app
+
+# Then install dependencies and run
+cd my-app
+pnpm install
+pnpm dev
+```
+
+<Callout type="info" title="What gets scaffolded?">
+The scaffolded project includes Effect + @effect/platform HTTP server, example routes with CRUD operations,
+TypeScript configuration, and development scripts with hot reload.
+</Callout>
+
+### serve
+
+Start the development server with hot reload:
+
+```bash
+# Start development server
+npx gello serve
+
+# Or with a custom port
+npx gello serve --port 4000
+```
+
+### route:list
+
+Display all registered routes in a beautiful TUI:
+
+```bash
+# Display all routes
+npx gello route:list
+
+# Output as JSON
+npx gello route:list --json
+
+# Filter by method
+npx gello route:list --method GET
+
+# Filter by path
+npx gello route:list --path /users
+```
+
+### Generators (Coming Soon)
+
+```bash
+# Generate a controller
+npx gello make:controller User
+
+# Generate a service
+npx gello make:service Email
+
+# Generate a job
+npx gello make:job SendWelcomeEmail
+```
+
+### Database (Coming Soon)
+
+```bash
+# Run migrations
+npx gello migrate
+
+# Create a new migration
+npx gello migrate:make add_users_table
+
+# Rollback last migration
+npx gello migrate:rollback
+```
+
+### Queue (Coming Soon)
+
+```bash
+# Start queue worker
+npx gello queue:work
+
+# Show queue status
+npx gello queue:status
+
+# Clear failed jobs
+npx gello queue:clear --failed
+```
+
+## Help
+
+```bash
+# Show help
+npx gello --help
+
+# Show version
+npx gello --version
+```
+
+## Route List Output
+
+The `route:list` command displays a beautiful TUI with:
+
+- GELLO ASCII art logo
+- Stats bar with total routes and method counts
+- Routes grouped by path prefix
+- Color-coded HTTP methods (GET=green, POST=yellow, DELETE=red)
+
+```text
+ ██████╗ ███████╗██╗     ██╗      ██████╗
+██╔════╝ ██╔════╝██║     ██║     ██╔═══██╗
+██║  ███╗█████╗  ██║     ██║     ██║   ██║
+██║   ██║██╔══╝  ██║     ██║     ██║   ██║
+╚██████╔╝███████╗███████╗███████╗╚██████╔╝
+ ╚═════╝ ╚══════╝╚══════╝╚══════╝ ╚═════╝
+
+Route List • Todo API
+
+Total: 9 routes  │  GET:4  POST:2  PATCH:1  DELETE:2
+
+──────────────────────────────────────────
+METHOD    PATH                    HANDLER
+──────────────────────────────────────────
+
+/
+GET       /                       apiInfo
+
+/health
+GET       /health                 healthCheck
+
+/todos
+GET       /todos                  listTodos
+GET       /todos/:id              getTodoById
+POST      /todos                  createTodoRoute
+PATCH     /todos/:id              updateTodoRoute
+DELETE    /todos/:id              deleteTodoRoute
+```

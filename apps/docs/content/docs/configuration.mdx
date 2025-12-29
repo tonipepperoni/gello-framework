@@ -1,0 +1,299 @@
+---
+title: Configuration
+description: Laravel-inspired configuration with dot notation, environment detection, and type-safe validation
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+## Overview
+
+Gello provides a powerful configuration system via `@gello/config` that supports:
+
+- Environment variable loading with sensible defaults
+- Dot notation access: `config.get("database.host")`
+- Type coercion: strings, numbers, booleans
+- Schema validation with Effect Schema
+- Environment detection (local, development, staging, production, testing)
+- .env file loading with cascading priority
+- Testing utilities for easy overrides
+
+## Quick Start
+
+Generated projects include a `src/config/index.ts` file with a pre-configured setup:
+
+```typescript
+import { env } from '@gello/config';
+
+export const config = {
+  app: {
+    name: env('APP_NAME', 'my-app'),
+    env: env('APP_ENV', 'local'),
+    debug: env('APP_DEBUG', 'true') === 'true',
+  },
+
+  server: {
+    host: env('APP_HOST', '0.0.0.0'),
+    port: Number(env('APP_PORT', '3000')),
+  },
+
+  database: {
+    host: env('DB_HOST', 'localhost'),
+    port: Number(env('DB_PORT', '5432')),
+    name: env('DB_NAME', 'gello'),
+    user: env('DB_USER', 'gello'),
+    password: env('DB_PASSWORD', ''),
+  },
+
+  redis: {
+    host: env('REDIS_HOST', 'localhost'),
+    port: Number(env('REDIS_PORT', '6379')),
+    password: env('REDIS_PASSWORD', ''),
+  },
+
+  queue: {
+    driver: env('QUEUE_DRIVER', 'memory') as 'memory' | 'redis',
+    prefix: env('QUEUE_PREFIX', 'gello:'),
+  },
+} as const;
+```
+
+## Environment Files
+
+Gello loads `.env` files with Laravel-style cascading priority (highest to lowest):
+
+1. `.env.{environment}.local` — Environment-specific local overrides (gitignored)
+2. `.env.local` — Local overrides (gitignored)
+3. `.env.{environment}` — Environment-specific defaults
+4. `.env` — Base defaults
+
+<Callout type="warn" title="Security">
+Never commit `.env` files with secrets. Use `.env.example` as a template.
+</Callout>
+
+### Example .env.example
+
+```bash
+# Application
+APP_NAME=my-app
+APP_ENV=local
+APP_DEBUG=true
+
+# Server
+APP_HOST=0.0.0.0
+APP_PORT=3000
+
+# Database (PostgreSQL)
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=gello
+DB_USER=gello
+DB_PASSWORD=secret
+DB_SSL=false
+DB_POOL_MIN=2
+DB_POOL_MAX=10
+
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DATABASE=0
+REDIS_TLS=false
+
+# Queue
+QUEUE_DRIVER=memory
+QUEUE_DEFAULT=default
+QUEUE_PREFIX=gello:
+```
+
+## The env() Helper
+
+The `env()` function reads from `process.env` with an optional default:
+
+```typescript
+import { env } from '@gello/config';
+
+// With default (returns string)
+const port = env('PORT', '3000');
+
+// Without default (returns string | undefined)
+const apiKey = env('API_KEY');
+
+// Type coercion
+const portNum = Number(env('PORT', '3000'));
+const debug = env('DEBUG', 'false') === 'true';
+```
+
+## Config Service (Effect Pattern)
+
+For Effect-based applications, use the Config service with dependency injection:
+
+```typescript
+import { Effect } from 'effect';
+import {
+  Config,
+  layer,
+  get,
+  string,
+  number,
+  boolean,
+  schema,
+} from '@gello/config';
+
+// Create a config layer from static data
+const configLayer = layer({
+  app: { name: 'my-app', debug: true },
+  database: { host: 'localhost', port: 5432 },
+});
+
+// Access config in Effects
+const program = Effect.gen(function* () {
+  const appName = yield* string('app.name');
+  const dbPort = yield* number('database.port');
+  const debug = yield* boolean('app.debug');
+
+  return { appName, dbPort, debug };
+});
+
+// Run with the config layer
+Effect.runPromise(
+  Effect.provide(program, configLayer)
+);
+```
+
+## Schema Validation
+
+Validate config values against Effect Schema for runtime type safety:
+
+```typescript
+import { schema } from '@gello/config';
+import { Port, Email, Url, NonEmptyString } from '@gello/config';
+
+// Built-in validators
+const port = yield* schema('server.port', Port);           // 1-65535
+const email = yield* schema('admin.email', Email);         // Valid email format
+const apiUrl = yield* schema('api.url', Url);              // Valid URL
+const appName = yield* schema('app.name', NonEmptyString); // Non-empty string
+
+// Custom schema
+import { Schema } from '@effect/schema';
+
+const LogLevel = Schema.Literal('debug', 'info', 'warn', 'error');
+const level = yield* schema('log.level', LogLevel);
+```
+
+## Built-in Validators
+
+```typescript
+import {
+  // String validators
+  NonEmptyString,        // String with length >= 1
+  TrimmedString,         // Trimmed non-empty string
+
+  // Number validators
+  Port,                  // Integer 1-65535
+  PositiveInt,           // Integer > 0
+  NonNegativeInt,        // Integer >= 0
+  Timeout,               // Integer 0-300000 (5 min max)
+  PoolSize,              // Integer 1-100
+  Percentage,            // Number 0-100
+
+  // Format validators
+  Url,                   // Valid HTTP(S) URL
+  Email,                 // Valid email format
+  UUID,                  // Valid UUID
+  Hostname,              // Valid hostname or IP
+
+  // Enum validators
+  LogLevel,              // "debug" | "info" | "warn" | "error" | "fatal"
+  EnvironmentSchema,     // "local" | "development" | "staging" | "production" | "testing"
+
+  // Coercion schemas
+  BooleanFromString,     // "true"/"1"/"yes"/"on" → true
+  NumberFromString,      // "123" → 123
+  PortFromString,        // "3000" → 3000 (validated)
+} from '@gello/config';
+```
+
+## Environment Detection
+
+Detect and respond to the current environment:
+
+```typescript
+import {
+  environment,
+  isLocal,
+  isDevelopment,
+  isProduction,
+  isTesting,
+  isStaging,
+  whenEnvironment,
+  whenLocal,
+  whenProduction,
+} from '@gello/config';
+
+// Get current environment
+const env = yield* environment; // "local" | "development" | "staging" | "production" | "testing"
+
+// Check environment
+const isProd = yield* isProduction;  // boolean
+const isDev = yield* isDevelopment;  // true for "local" or "development"
+
+// Conditional execution
+yield* whenProduction(
+  Effect.log('Running in production mode')
+);
+
+yield* whenLocal(
+  Effect.log('Debug mode enabled')
+);
+
+yield* whenEnvironment(['staging', 'production'],
+  Effect.sync(() => enableMetrics())
+);
+```
+
+### Environment Priority
+
+Environment is detected from these variables in order:
+
+1. `GELLO_ENV`
+2. `APP_ENV`
+3. `NODE_ENV`
+
+Aliases are supported: `dev` → development, `prod` → production, `test` → testing
+
+## Testing Utilities
+
+Override config easily in tests:
+
+```typescript
+import { testLayer, withOverrides, layer } from '@gello/config';
+
+// Create a test layer
+const testConfig = testLayer({
+  database: { host: 'test-db', port: 5433 },
+  app: { debug: true },
+});
+
+// Run with test config
+const result = await Effect.runPromise(
+  Effect.provide(myEffect, testConfig)
+);
+
+// Or use withOverrides for inline overrides
+const result = await Effect.runPromise(
+  withOverrides(
+    { database: { host: 'localhost' } },
+    myEffect
+  )
+);
+```
+
+## Best Practices
+
+- **Never commit `.env`** — Use `.env.example` as a template
+- **Use defaults for development** — Make the app run with zero config locally
+- **Validate early** — Use schema validation for critical config values
+- **Mask secrets** — Never log passwords or API keys
+- **Environment-specific files** — Use `.env.production` for prod defaults
+- **Centralize config** — Keep all config in `src/config/index.ts`

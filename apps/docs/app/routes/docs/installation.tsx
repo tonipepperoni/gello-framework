@@ -1,5 +1,19 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { DocsContent, CodeBlock, Callout, Tabs, Tab } from '../../components';
+import {
+  DocsContent,
+  CodeBlock,
+  Callout,
+  Tabs,
+  Tab,
+  Steps,
+  Step,
+  Files,
+  File,
+  Folder,
+  Card,
+  Cards,
+  TypeTable,
+} from '../../components';
 
 export const Route = createFileRoute('/docs/installation')({
   component: InstallationPage,
@@ -12,13 +26,22 @@ function InstallationPage() {
       description="Get started with Gello in seconds using the CLI"
     >
       <h2>Quick Start (Recommended)</h2>
-      <p>
-        The fastest way to create a new Gello project is using the CLI:
-      </p>
-      <CodeBlock lang="bash" code={`npx gello new my-app
-cd my-app
-pnpm install
-pnpm dev`} />
+      <Steps>
+        <Step>
+          <h3>Create a new project</h3>
+          <p>Use the Gello CLI to scaffold a complete project:</p>
+          <CodeBlock lang="bash" code={`npx gello new my-app`} />
+        </Step>
+        <Step>
+          <h3>Install dependencies</h3>
+          <CodeBlock lang="bash" code={`cd my-app
+pnpm install`} />
+        </Step>
+        <Step>
+          <h3>Start development server</h3>
+          <CodeBlock lang="bash" code={`pnpm dev`} />
+        </Step>
+      </Steps>
 
       <Callout type="info" title="What gets scaffolded?">
         This creates a complete project with Effect, HTTP server, and example routes — ready to go.
@@ -30,7 +53,7 @@ pnpm dev`} />
       </p>
 
       <h3>Core Packages</h3>
-      <Tabs items={['pnpm', 'npm', 'yarn']}>
+      <Tabs items={['pnpm', 'npm', 'yarn']} persist groupId="pkg">
         <Tab value="pnpm">
           <CodeBlock lang="bash" code={`# Core framework
 pnpm add @gello/core @gello/common @gello/platform-node
@@ -69,54 +92,37 @@ pnpm add -D @gello/testing`} />
 pnpm add -D drizzle-kit @types/pg`} />
 
       <h2>Package Overview</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Package</th>
-            <th>Description</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><code>@gello/core</code></td>
-            <td>Core contracts, errors, and base types</td>
-          </tr>
-          <tr>
-            <td><code>@gello/common</code></td>
-            <td>Middleware, routing, validation utilities</td>
-          </tr>
-          <tr>
-            <td><code>@gello/platform-node</code></td>
-            <td>Node.js HTTP adapter</td>
-          </tr>
-          <tr>
-            <td><code>@gello/queue</code></td>
-            <td>Effect-native queue system</td>
-          </tr>
-          <tr>
-            <td><code>@gello/fp</code></td>
-            <td>Optics, refined types, FP utilities</td>
-          </tr>
-          <tr>
-            <td><code>@gello/testing</code></td>
-            <td>Testing utilities and mocks</td>
-          </tr>
-        </tbody>
-      </table>
+      <Cards>
+        <Card title="@gello/core" description="Core contracts, errors, and base types" />
+        <Card title="@gello/common" description="Middleware, routing, validation utilities" />
+        <Card title="@gello/platform-node" description="Node.js HTTP adapter" />
+        <Card title="@gello/queue" description="Effect-native queue system" />
+        <Card title="@gello/fp" description="Optics, refined types, FP utilities" />
+        <Card title="@gello/testing" description="Testing utilities and mocks" />
+      </Cards>
 
       <h2>Project Structure</h2>
-      <CodeBlock lang="text" code={`src/
-├── main.ts              # Entry point — Layer.launch(MainLayer)
-├── layers/
-│   ├── Config.ts        # Config Layer with Effect.Config
-│   ├── Database.ts      # PgPool + Drizzle Layers
-│   └── Redis.ts         # Redis Layer with acquireRelease
-├── services/
-│   └── UserRepo.ts      # Service Layers using Context.Tag
-├── routes/
-│   └── users.ts         # HttpRouter handlers
-└── lib/
-    └── schema.ts        # Drizzle schema definitions`} />
+      <Files>
+        <Folder name="src" defaultOpen>
+          <File name="main.ts" />
+          <Folder name="layers" defaultOpen>
+            <File name="Config.ts" />
+            <File name="Database.ts" />
+            <File name="Redis.ts" />
+          </Folder>
+          <Folder name="services">
+            <File name="UserRepo.ts" />
+          </Folder>
+          <Folder name="routes">
+            <File name="users.ts" />
+          </Folder>
+          <Folder name="lib">
+            <File name="schema.ts" />
+          </Folder>
+        </Folder>
+        <File name="package.json" />
+        <File name="tsconfig.json" />
+      </Files>
 
       <h2>TypeScript Config</h2>
       <CodeBlock lang="json" code={`{
@@ -133,7 +139,7 @@ pnpm add -D drizzle-kit @types/pg`} />
 }`} />
 
       <h2>Entry Point</h2>
-      <CodeBlock code={`// src/main.ts
+      <CodeBlock lang="typescript" code={`// src/main.ts
 import { pipe } from "effect"
 import * as Layer from "effect/Layer"
 import * as HttpServer from "@effect/platform/HttpServer"

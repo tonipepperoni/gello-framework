@@ -1,0 +1,185 @@
+---
+title: Installation
+description: Get started with Gello in seconds using the CLI
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Card, Cards } from 'fumadocs-ui/components/card';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { File, Files, Folder } from 'fumadocs-ui/components/files';
+
+## Quick Start (Recommended)
+
+<Steps>
+<Step>
+### Create a new project
+
+Use the Gello CLI to scaffold a complete project:
+
+```bash
+npx gello new my-app
+```
+</Step>
+<Step>
+### Install dependencies
+
+```bash
+cd my-app
+pnpm install
+```
+</Step>
+<Step>
+### Start development server
+
+```bash
+pnpm dev
+```
+</Step>
+</Steps>
+
+<Callout type="info" title="What gets scaffolded?">
+This creates a complete project with Effect, HTTP server, and example routes — ready to go.
+</Callout>
+
+## Manual Installation
+
+If you prefer to add Gello to an existing project, install the packages directly:
+
+### Core Packages
+
+<Tabs items={['pnpm', 'npm', 'yarn']} persist groupId="pkg">
+<Tab value="pnpm">
+```bash
+# Core framework
+pnpm add @gello/core @gello/common @gello/platform-node
+
+# Effect runtime (peer dependencies)
+pnpm add effect @effect/platform @effect/platform-node @effect/schema
+```
+</Tab>
+<Tab value="npm">
+```bash
+# Core framework
+npm install @gello/core @gello/common @gello/platform-node
+
+# Effect runtime (peer dependencies)
+npm install effect @effect/platform @effect/platform-node @effect/schema
+```
+</Tab>
+<Tab value="yarn">
+```bash
+# Core framework
+yarn add @gello/core @gello/common @gello/platform-node
+
+# Effect runtime (peer dependencies)
+yarn add effect @effect/platform @effect/platform-node @effect/schema
+```
+</Tab>
+</Tabs>
+
+### Optional Packages
+
+```bash
+# Queue system
+pnpm add @gello/queue
+
+# Functional programming utilities (optics, refined types)
+pnpm add @gello/fp
+
+# Testing utilities
+pnpm add -D @gello/testing
+```
+
+### Database (Drizzle + Postgres)
+
+```bash
+pnpm add drizzle-orm pg
+pnpm add -D drizzle-kit @types/pg
+```
+
+## Package Overview
+
+<Cards>
+  <Card title="@gello/core" description="Core contracts, errors, and base types" />
+  <Card title="@gello/common" description="Middleware, routing, validation utilities" />
+  <Card title="@gello/platform-node" description="Node.js HTTP adapter" />
+  <Card title="@gello/queue" description="Effect-native queue system" />
+  <Card title="@gello/fp" description="Optics, refined types, FP utilities" />
+  <Card title="@gello/testing" description="Testing utilities and mocks" />
+</Cards>
+
+## Project Structure
+
+<Files>
+  <Folder name="src" defaultOpen>
+    <File name="main.ts" />
+    <Folder name="layers" defaultOpen>
+      <File name="Config.ts" />
+      <File name="Database.ts" />
+      <File name="Redis.ts" />
+    </Folder>
+    <Folder name="services">
+      <File name="UserRepo.ts" />
+    </Folder>
+    <Folder name="routes">
+      <File name="users.ts" />
+    </Folder>
+    <Folder name="lib">
+      <File name="schema.ts" />
+    </Folder>
+  </Folder>
+  <File name="package.json" />
+  <File name="tsconfig.json" />
+</Files>
+
+## TypeScript Config
+
+```json
+{
+  "compilerOptions": {
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "moduleResolution": "NodeNext",
+    "module": "NodeNext",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  }
+}
+```
+
+## Entry Point
+
+```typescript
+// src/main.ts
+import { pipe } from "effect"
+import * as Layer from "effect/Layer"
+import * as HttpServer from "@effect/platform/HttpServer"
+import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer"
+import * as NodeRuntime from "@effect/platform-node/NodeRuntime"
+import { createServer } from "node:http"
+
+import { AppRouter } from "./routes"
+import { AppLayer } from "./layers"
+
+const MainLayer = pipe(
+  HttpServer.serve(AppRouter),
+  HttpServer.withLogAddress,
+  Layer.provide(AppLayer),
+  Layer.provide(NodeHttpServer.layer(createServer, { port: 3000 }))
+)
+
+Layer.launch(MainLayer).pipe(NodeRuntime.runMain)
+```
+
+## Development
+
+```bash
+# Start development server with hot reload
+pnpm dev
+
+# Or using the CLI
+npx gello serve
+```

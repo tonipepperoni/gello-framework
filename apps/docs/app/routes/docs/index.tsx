@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { DocsContent, CodeBlock, Callout } from '../../components';
+import { DocsContent, CodeBlock, Callout, Mermaid } from '../../components';
 
 export const Route = createFileRoute('/docs/')({
   component: DocsIntroduction,
@@ -28,6 +28,52 @@ function DocsIntroduction() {
         <a href="https://github.com/Effect-TS/effect/tree/main/packages/platform" target="_blank" rel="noopener noreferrer">@effect/platform</a>,
         Gello follows the principle: <strong>program = value, interpret at the edge</strong>.
       </p>
+
+      <h2>Architecture Overview</h2>
+      <Mermaid chart={`
+flowchart TB
+    subgraph Edge["Edge (Runtime)"]
+        HTTP[HTTP Server]
+        CLI[CLI Commands]
+        Worker[Queue Workers]
+    end
+
+    subgraph App["Application Layer"]
+        Router[Router & Middleware]
+        Handlers[Route Handlers]
+        Jobs[Job Handlers]
+    end
+
+    subgraph Services["Service Layer"]
+        UserSvc[UserService]
+        CacheSvc[CacheService]
+        QueueSvc[QueueService]
+    end
+
+    subgraph Infra["Infrastructure Layer"]
+        DB[(Database)]
+        Redis[(Redis)]
+        FS[File System]
+    end
+
+    HTTP --> Router
+    CLI --> Handlers
+    Worker --> Jobs
+
+    Router --> Handlers
+    Handlers --> UserSvc
+    Handlers --> CacheSvc
+    Jobs --> QueueSvc
+
+    UserSvc --> DB
+    CacheSvc --> Redis
+    QueueSvc --> Redis
+
+    style Edge fill:#e1f5fe
+    style App fill:#f3e5f5
+    style Services fill:#e8f5e9
+    style Infra fill:#fff3e0
+`} />
 
       <h2>Core Philosophy</h2>
 

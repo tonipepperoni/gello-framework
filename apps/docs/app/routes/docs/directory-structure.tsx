@@ -1,5 +1,14 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { DocsContent, CodeBlock } from '../../components';
+import {
+  DocsContent,
+  CodeBlock,
+  Files,
+  File,
+  Folder,
+  Callout,
+  Accordions,
+  Accordion,
+} from '../../components';
 
 export const Route = createFileRoute('/docs/directory-structure')({
   component: DirectoryStructurePage,
@@ -12,34 +21,54 @@ function DirectoryStructurePage() {
       description="Recommended project layout for Gello applications"
     >
       <h2>Standard Layout</h2>
-      <CodeBlock lang="text" code={`src/
-├── main.ts              # Entry point — Layer.launch(MainLayer)
-├── layers/
-│   ├── index.ts         # Export AppLayer (merged layers)
-│   ├── Config.ts        # Config Layer with Effect.Config
-│   ├── Database.ts      # PgPool + Drizzle Layers
-│   └── Redis.ts         # Redis Layer with acquireRelease
-├── services/
-│   ├── UserRepo.ts      # Repository Layers
-│   ├── PostRepo.ts
-│   └── MailService.ts   # External service integrations
-├── routes/
-│   ├── index.ts         # Export all routes
-│   ├── users.ts         # User route handlers
-│   └── posts.ts         # Post route handlers
-├── jobs/
-│   ├── SendEmail.ts     # Job definitions
-│   └── ProcessUpload.ts
-├── schemas/
-│   ├── User.ts          # @effect/schema definitions
-│   └── Post.ts
-└── lib/
-    ├── db/
-    │   └── schema.ts    # Drizzle schema definitions
-    └── errors.ts        # Tagged error classes`} />
+      <Files>
+        <Folder name="src" defaultOpen>
+          <File name="main.ts" />
+          <Folder name="layers" defaultOpen>
+            <File name="index.ts" />
+            <File name="Config.ts" />
+            <File name="Database.ts" />
+            <File name="Redis.ts" />
+          </Folder>
+          <Folder name="services" defaultOpen>
+            <File name="UserRepo.ts" />
+            <File name="PostRepo.ts" />
+            <File name="MailService.ts" />
+          </Folder>
+          <Folder name="routes" defaultOpen>
+            <File name="index.ts" />
+            <File name="users.ts" />
+            <File name="posts.ts" />
+          </Folder>
+          <Folder name="jobs">
+            <File name="SendEmail.ts" />
+            <File name="ProcessUpload.ts" />
+          </Folder>
+          <Folder name="schemas">
+            <File name="User.ts" />
+            <File name="Post.ts" />
+          </Folder>
+          <Folder name="lib">
+            <Folder name="db">
+              <File name="schema.ts" />
+            </Folder>
+            <File name="errors.ts" />
+          </Folder>
+        </Folder>
+        <File name="package.json" />
+        <File name="tsconfig.json" />
+      </Files>
 
-      <h2>Entry Point</h2>
-      <CodeBlock code={`// src/main.ts
+      <Callout type="info">
+        This structure follows the principle: <strong>Layers for dependencies, Services for business logic, Routes for HTTP handlers.</strong>
+      </Callout>
+
+      <h2>Directory Breakdown</h2>
+
+      <Accordions type="single">
+        <Accordion id="entry" title="main.ts — Entry Point">
+          <p>The entry point where all layers are composed and launched:</p>
+          <CodeBlock lang="typescript" code={`// src/main.ts
 import { pipe } from "effect"
 import * as Layer from "effect/Layer"
 import * as HttpServer from "@effect/platform/HttpServer"
@@ -58,9 +87,11 @@ const MainLayer = pipe(
 )
 
 Layer.launch(MainLayer).pipe(NodeRuntime.runMain)`} />
+        </Accordion>
 
-      <h2>Layers Directory</h2>
-      <CodeBlock code={`// src/layers/index.ts
+        <Accordion id="layers" title="layers/ — Dependency Layers">
+          <p>Export all layers merged as <code>AppLayer</code>:</p>
+          <CodeBlock lang="typescript" code={`// src/layers/index.ts
 import { Layer } from "effect"
 import { ConfigLive } from "./Config"
 import { PgPoolLive, DbLive } from "./Database"
@@ -74,13 +105,11 @@ export const AppLayer = Layer.mergeAll(
   RedisLive,
   UserRepoLive
 )`} />
+        </Accordion>
 
-      <h2>Services Directory</h2>
-      <p>
-        Each service is a <code>Context.Tag</code> with a <code>Layer</code> implementation.
-      </p>
-
-      <CodeBlock code={`// src/services/UserRepo.ts
+        <Accordion id="services" title="services/ — Business Logic">
+          <p>Each service is a <code>Context.Tag</code> with a <code>Layer</code> implementation:</p>
+          <CodeBlock lang="typescript" code={`// src/services/UserRepo.ts
 import { Context, Effect, Layer } from "effect"
 import { Db } from "../layers/Database"
 
@@ -106,9 +135,10 @@ export const UserRepoLive = Layer.effect(
     }
   })
 )`} />
+        </Accordion>
 
-      <h2>Routes Directory</h2>
-      <CodeBlock code={`// src/routes/index.ts
+        <Accordion id="routes" title="routes/ — HTTP Handlers">
+          <CodeBlock lang="typescript" code={`// src/routes/index.ts
 import { route } from "@gello/core-adapters-node"
 import { userRoutes } from "./users"
 import { postRoutes } from "./posts"
@@ -123,9 +153,10 @@ export const routes = [
   ...userRoutes,
   ...postRoutes,
 ] as const`} />
+        </Accordion>
 
-      <h2>Schemas Directory</h2>
-      <CodeBlock code={`// src/schemas/User.ts
+        <Accordion id="schemas" title="schemas/ — Validation Schemas">
+          <CodeBlock lang="typescript" code={`// src/schemas/User.ts
 import * as S from "@effect/schema/Schema"
 
 export const CreateUser = S.Struct({
@@ -144,9 +175,33 @@ export const User = S.Struct({
 
 export type CreateUser = S.Schema.Type<typeof CreateUser>
 export type User = S.Schema.Type<typeof User>`} />
+        </Accordion>
+
+        <Accordion id="jobs" title="jobs/ — Background Jobs">
+          <CodeBlock lang="typescript" code={`// src/jobs/SendEmail.ts
+import { Effect, Layer } from "effect"
+import { Queue, Job } from "@gello/queue"
+
+export const SendEmailJob = Job.define("send-email", (data: EmailData) =>
+  Effect.gen(function* () {
+    const mailer = yield* MailService
+    yield* mailer.send(data)
+  })
+)
+
+export const EmailWorker = Layer.effect(
+  Queue.Worker,
+  Effect.gen(function* () {
+    const queue = yield* Queue
+    return yield* queue.process("emails", SendEmailJob)
+  })
+)`} />
+        </Accordion>
+      </Accordions>
 
       <h2>Worker Entry Point</h2>
-      <CodeBlock code={`// src/worker.ts
+      <p>For background job processing, create a separate worker entry:</p>
+      <CodeBlock lang="typescript" code={`// src/worker.ts
 import { pipe } from "effect"
 import * as Layer from "effect/Layer"
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime"

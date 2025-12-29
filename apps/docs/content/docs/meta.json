@@ -1,0 +1,25 @@
+{
+  "title": "Documentation",
+  "pages": [
+    "index",
+    "installation",
+    "---Getting Started---",
+    "configuration",
+    "directory-structure",
+    "---Core Concepts---",
+    "dependency-injection",
+    "http",
+    "routing",
+    "middleware",
+    "validation",
+    "error-handling",
+    "---Features---",
+    "database",
+    "queues",
+    "caching",
+    "logger",
+    "time",
+    "---Tools---",
+    "cli"
+  ]
+}

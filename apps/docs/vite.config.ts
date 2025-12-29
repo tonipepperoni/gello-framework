@@ -8,6 +8,8 @@ import mdx from '@mdx-js/rollup';
 import remarkGfm from 'remark-gfm';
 import remarkFrontmatter from 'remark-frontmatter';
 import remarkMdxFrontmatter from 'remark-mdx-frontmatter';
+import { remarkHeading } from 'fumadocs-core/mdx-plugins';
+import { remarkTocExport } from './app/lib/remark-toc-export';
 import rehypeSlug from 'rehype-slug';
 import rehypeAutolinkHeadings from 'rehype-autolink-headings';
 
@@ -17,7 +19,13 @@ export default defineConfig({
     tailwindcss(),
     cloudflare({ viteEnvironment: { name: 'ssr' } }),
     mdx({
-      remarkPlugins: [remarkGfm, remarkFrontmatter, remarkMdxFrontmatter],
+      remarkPlugins: [
+        remarkGfm,
+        remarkFrontmatter,
+        remarkMdxFrontmatter,
+        remarkHeading,    // Extract headings and generate TOC
+        remarkTocExport,  // Export TOC as tableOfContents
+      ],
       rehypePlugins: [rehypeSlug, rehypeAutolinkHeadings],
       providerImportSource: '@mdx-js/react',
     }),

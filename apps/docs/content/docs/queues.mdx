@@ -15,44 +15,6 @@ Queues use `Context.Tag` for services, `Layer.scoped` for lifecycle management,
 and Effect primitives like `Queue`, `Fiber`, and `Ref` — no external dependencies required.
 </Callout>
 
-## Architecture
-
-The queue system follows hexagonal architecture with clear separation between domain, ports, and adapters.
-
-<Mermaid chart={`
-flowchart TB
-    subgraph Application["Application Layer"]
-        dispatch["Queue.push(job)"]
-        define["Job Definitions"]
-        middleware["Job Middleware"]
-    end
-
-    subgraph Domain["Domain Layer"]
-        job["Job"]
-        jobid["JobId"]
-        queuename["QueueName"]
-        priority["JobPriority"]
-        status["JobStatus"]
-        failed["FailedJob"]
-    end
-
-    subgraph Ports["Port Layer"]
-        driver["QueueDriver"]
-        repo["FailedJobRepository"]
-    end
-
-    subgraph Adapters["Adapter Layer"]
-        memory["MemoryDriver"]
-        redis["RedisDriver"]
-        database["DatabaseDriver"]
-        sync["SyncDriver"]
-    end
-
-    Application --> Domain
-    Domain --> Ports
-    Ports --> Adapters
-`} />
-
 ## Getting Started
 
 <Steps>

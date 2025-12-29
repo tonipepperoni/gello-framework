@@ -2,19 +2,37 @@
   "name": "cli",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "tools/cli/src",
-  "projectType": "library",
+  "projectType": "application",
   "tags": [],
   "targets": {
     "build": {
       "executor": "@nx/esbuild:esbuild",
       "outputs": ["{options.outputPath}"],
       "options": {
-        "outputPath": "dist/tools/cli",
-        "main": "tools/cli/src/index.ts",
+        "outputPath": "tools/cli/dist",
+        "main": "tools/cli/src/main.tsx",
+        "additionalEntryPoints": ["tools/cli/src/index.ts"],
         "tsConfig": "tools/cli/tsconfig.lib.json",
         "assets": ["tools/cli/*.md"],
-        "format": ["cjs"],
-        "generatePackageJson": true
+        "format": ["esm"],
+        "bundle": true,
+        "platform": "node",
+        "external": ["ink", "react", "yoga-wasm-web", "ink-spinner"]
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx tsx --tsconfig tools/cli/tsconfig.lib.json tools/cli/src/main.tsx",
+        "forwardAllArgs": true
+      }
+    },
+    "publish": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "command": "npm publish --access public",
+        "cwd": "tools/cli/dist"
       }
     }
   }

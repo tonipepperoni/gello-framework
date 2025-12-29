@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { CodeBlock } from '../../components/CodeBlock';
+import { DocsContent, CodeBlock, Callout } from '../../components';
 
 export const Route = createFileRoute('/docs/configuration')({
   component: ConfigurationPage,
@@ -7,108 +7,292 @@ export const Route = createFileRoute('/docs/configuration')({
 
 function ConfigurationPage() {
   return (
-    <article className="prose">
-      <h1>Configuration</h1>
-      <p className="text-xl text-zinc-400 mb-8">
-        Effect.Config + Layer — validated at startup, accessed via context
-      </p>
-
-      <h2>The Pattern</h2>
+    <DocsContent
+      title="Configuration"
+      description="Laravel-inspired configuration with dot notation, environment detection, and type-safe validation"
+    >
+      <h2>Overview</h2>
       <p>
-        Configuration is a Layer. Define it with <code>Effect.Config</code>, expose it via{' '}
-        <code>Context.Tag</code>, and yield from context in handlers. No global config object.
+        Gello provides a powerful configuration system via <code>@gello/config</code> that supports:
       </p>
+      <ul>
+        <li>Environment variable loading with sensible defaults</li>
+        <li>Dot notation access: <code>config.get("database.host")</code></li>
+        <li>Type coercion: strings, numbers, booleans</li>
+        <li>Schema validation with Effect Schema</li>
+        <li>Environment detection (local, development, staging, production, testing)</li>
+        <li>.env file loading with cascading priority</li>
+        <li>Testing utilities for easy overrides</li>
+      </ul>
 
-      <h2>Defining Config</h2>
-      <CodeBlock code={`import { Context, Config, Effect, Layer } from "effect"
+      <h2>Quick Start</h2>
+      <p>
+        Generated projects include a <code>src/config/index.ts</code> file with a pre-configured setup:
+      </p>
+      <CodeBlock code={`import { env } from '@gello/config';
 
-// 1) Define the config shape
-const AppConfigSchema = Config.all({
-  DATABASE_URL: Config.string("DATABASE_URL"),
-  REDIS_URL: Config.string("REDIS_URL"),
-  PORT: Config.integer("PORT").pipe(Config.withDefault(3000)),
-  NODE_ENV: Config.literal("development", "production", "test")("NODE_ENV").pipe(
-    Config.withDefault("development")
-  )
-})
+export const config = {
+  app: {
+    name: env('APP_NAME', 'my-app'),
+    env: env('APP_ENV', 'local'),
+    debug: env('APP_DEBUG', 'true') === 'true',
+  },
 
-// 2) Infer the type
-type AppConfig = Config.Config.Success<typeof AppConfigSchema>
+  server: {
+    host: env('APP_HOST', '0.0.0.0'),
+    port: Number(env('APP_PORT', '3000')),
+  },
 
-// 3) Create the Context.Tag
-class Config extends Context.Tag("Config")<Config, AppConfig>() {}
+  database: {
+    host: env('DB_HOST', 'localhost'),
+    port: Number(env('DB_PORT', '5432')),
+    name: env('DB_NAME', 'gello'),
+    user: env('DB_USER', 'gello'),
+    password: env('DB_PASSWORD', ''),
+  },
 
-// 4) Create the Layer — reads from environment
-const ConfigLive = Layer.effect(
+  redis: {
+    host: env('REDIS_HOST', 'localhost'),
+    port: Number(env('REDIS_PORT', '6379')),
+    password: env('REDIS_PASSWORD', ''),
+  },
+
+  queue: {
+    driver: env('QUEUE_DRIVER', 'memory') as 'memory' | 'redis',
+    prefix: env('QUEUE_PREFIX', 'gello:'),
+  },
+} as const;`} />
+
+      <h2>Environment Files</h2>
+      <p>
+        Gello loads <code>.env</code> files with Laravel-style cascading priority (highest to lowest):
+      </p>
+      <ol>
+        <li><code>.env.{'{environment}'}.local</code> — Environment-specific local overrides (gitignored)</li>
+        <li><code>.env.local</code> — Local overrides (gitignored)</li>
+        <li><code>.env.{'{environment}'}</code> — Environment-specific defaults</li>
+        <li><code>.env</code> — Base defaults</li>
+      </ol>
+
+      <Callout type="warn" title="Security">
+        Never commit <code>.env</code> files with secrets. Use <code>.env.example</code> as a template.
+      </Callout>
+
+      <h3>Example .env.example</h3>
+      <CodeBlock lang="bash" code={`# Application
+APP_NAME=my-app
+APP_ENV=local
+APP_DEBUG=true
+
+# Server
+APP_HOST=0.0.0.0
+APP_PORT=3000
+
+# Database (PostgreSQL)
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=gello
+DB_USER=gello
+DB_PASSWORD=secret
+DB_SSL=false
+DB_POOL_MIN=2
+DB_POOL_MAX=10
+
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DATABASE=0
+REDIS_TLS=false
+
+# Queue
+QUEUE_DRIVER=memory
+QUEUE_DEFAULT=default
+QUEUE_PREFIX=gello:`} />
+
+      <h2>The env() Helper</h2>
+      <p>
+        The <code>env()</code> function reads from <code>process.env</code> with an optional default:
+      </p>
+      <CodeBlock code={`import { env } from '@gello/config';
+
+// With default (returns string)
+const port = env('PORT', '3000');
+
+// Without default (returns string | undefined)
+const apiKey = env('API_KEY');
+
+// Type coercion
+const portNum = Number(env('PORT', '3000'));
+const debug = env('DEBUG', 'false') === 'true';`} />
+
+      <h2>Config Service (Effect Pattern)</h2>
+      <p>
+        For Effect-based applications, use the Config service with dependency injection:
+      </p>
+      <CodeBlock code={`import { Effect } from 'effect';
+import {
   Config,
-  Effect.config(AppConfigSchema)
-)`} />
+  layer,
+  get,
+  string,
+  number,
+  boolean,
+  schema,
+} from '@gello/config';
 
-      <h2>Using in Layers</h2>
-      <CodeBlock code={`// Other layers can depend on Config
-const PgPoolLive = Layer.scoped(
-  PgPool,
-  Effect.gen(function* () {
-    const cfg = yield* Config
-    const pool = new Pool({ connectionString: cfg.DATABASE_URL })
-    yield* Effect.addFinalizer(() =>
-      Effect.tryPromise(() => pool.end()).pipe(Effect.orDie)
-    )
-    return pool
-  })
-).pipe(Layer.provide(ConfigLive))`} />
+// Create a config layer from static data
+const configLayer = layer({
+  app: { name: 'my-app', debug: true },
+  database: { host: 'localhost', port: 5432 },
+});
 
-      <h2>Using in Handlers</h2>
-      <CodeBlock code={`HttpRouter.get("/info", Effect.gen(function* () {
-  const cfg = yield* Config
-  return HttpServerResponse.json({
-    environment: cfg.NODE_ENV,
-    port: cfg.PORT
-  })
-}))`} />
+// Access config in Effects
+const program = Effect.gen(function* () {
+  const appName = yield* string('app.name');
+  const dbPort = yield* number('database.port');
+  const debug = yield* boolean('app.debug');
 
-      <h2>Nested Config</h2>
-      <CodeBlock code={`// Group related config with Config.nested
-const DatabaseConfig = Config.all({
-  url: Config.string("URL"),
-  poolMin: Config.integer("POOL_MIN").pipe(Config.withDefault(2)),
-  poolMax: Config.integer("POOL_MAX").pipe(Config.withDefault(10)),
-  ssl: Config.boolean("SSL").pipe(Config.withDefault(false))
-}).pipe(Config.nested("DATABASE"))
+  return { appName, dbPort, debug };
+});
 
-// Reads: DATABASE_URL, DATABASE_POOL_MIN, DATABASE_POOL_MAX, DATABASE_SSL`} />
+// Run with the config layer
+Effect.runPromise(
+  Effect.provide(program, configLayer)
+);`} />
 
-      <h2>Secret Values</h2>
-      <CodeBlock code={`// Config.secret wraps the value — won't leak in logs
-const SecureConfig = Config.all({
-  apiKey: Config.secret("API_KEY"),
-  dbPassword: Config.secret("DB_PASSWORD")
-})
-
-// Access the underlying value
-const cfg = yield* Effect.config(SecureConfig)
-const key = Secret.value(cfg.apiKey) // string`} />
-
-      <h2>Validation at Startup</h2>
+      <h2>Schema Validation</h2>
       <p>
-        Config is validated when the Layer is built. Missing or invalid values fail fast
-        with clear error messages:
+        Validate config values against Effect Schema for runtime type safety:
       </p>
-      <CodeBlock lang="text" code={`ConfigError: Missing data at NODE_ENV: Expected one of
-("development" | "production" | "test") but received "staging"`} />
+      <CodeBlock code={`import { schema } from '@gello/config';
+import { Port, Email, Url, NonEmptyString } from '@gello/config';
 
-      <h2>Testing with Config</h2>
-      <CodeBlock code={`// Override config in tests
-const ConfigTest = Layer.succeed(Config, {
-  DATABASE_URL: "postgres://localhost/test",
-  REDIS_URL: "redis://localhost",
-  PORT: 3001,
-  NODE_ENV: "test" as const
-})
+// Built-in validators
+const port = yield* schema('server.port', Port);           // 1-65535
+const email = yield* schema('admin.email', Email);         // Valid email format
+const apiUrl = yield* schema('api.url', Url);              // Valid URL
+const appName = yield* schema('app.name', NonEmptyString); // Non-empty string
 
-await Effect.runPromise(
-  myEffect.pipe(Effect.provide(ConfigTest))
-)`} />
-    </article>
+// Custom schema
+import { Schema } from '@effect/schema';
+
+const LogLevel = Schema.Literal('debug', 'info', 'warn', 'error');
+const level = yield* schema('log.level', LogLevel);`} />
+
+      <h2>Built-in Validators</h2>
+      <CodeBlock code={`import {
+  // String validators
+  NonEmptyString,        // String with length >= 1
+  TrimmedString,         // Trimmed non-empty string
+
+  // Number validators
+  Port,                  // Integer 1-65535
+  PositiveInt,           // Integer > 0
+  NonNegativeInt,        // Integer >= 0
+  Timeout,               // Integer 0-300000 (5 min max)
+  PoolSize,              // Integer 1-100
+  Percentage,            // Number 0-100
+
+  // Format validators
+  Url,                   // Valid HTTP(S) URL
+  Email,                 // Valid email format
+  UUID,                  // Valid UUID
+  Hostname,              // Valid hostname or IP
+
+  // Enum validators
+  LogLevel,              // "debug" | "info" | "warn" | "error" | "fatal"
+  EnvironmentSchema,     // "local" | "development" | "staging" | "production" | "testing"
+
+  // Coercion schemas
+  BooleanFromString,     // "true"/"1"/"yes"/"on" → true
+  NumberFromString,      // "123" → 123
+  PortFromString,        // "3000" → 3000 (validated)
+} from '@gello/config';`} />
+
+      <h2>Environment Detection</h2>
+      <p>
+        Detect and respond to the current environment:
+      </p>
+      <CodeBlock code={`import {
+  environment,
+  isLocal,
+  isDevelopment,
+  isProduction,
+  isTesting,
+  isStaging,
+  whenEnvironment,
+  whenLocal,
+  whenProduction,
+} from '@gello/config';
+
+// Get current environment
+const env = yield* environment; // "local" | "development" | "staging" | "production" | "testing"
+
+// Check environment
+const isProd = yield* isProduction;  // boolean
+const isDev = yield* isDevelopment;  // true for "local" or "development"
+
+// Conditional execution
+yield* whenProduction(
+  Effect.log('Running in production mode')
+);
+
+yield* whenLocal(
+  Effect.log('Debug mode enabled')
+);
+
+yield* whenEnvironment(['staging', 'production'],
+  Effect.sync(() => enableMetrics())
+);`} />
+
+      <h3>Environment Priority</h3>
+      <p>
+        Environment is detected from these variables in order:
+      </p>
+      <ol>
+        <li><code>GELLO_ENV</code></li>
+        <li><code>APP_ENV</code></li>
+        <li><code>NODE_ENV</code></li>
+      </ol>
+      <p>
+        Aliases are supported: <code>dev</code> → development, <code>prod</code> → production, <code>test</code> → testing
+      </p>
+
+      <h2>Testing Utilities</h2>
+      <p>
+        Override config easily in tests:
+      </p>
+      <CodeBlock code={`import { testLayer, withOverrides, layer } from '@gello/config';
+
+// Create a test layer
+const testConfig = testLayer({
+  database: { host: 'test-db', port: 5433 },
+  app: { debug: true },
+});
+
+// Run with test config
+const result = await Effect.runPromise(
+  Effect.provide(myEffect, testConfig)
+);
+
+// Or use withOverrides for inline overrides
+const result = await Effect.runPromise(
+  withOverrides(
+    { database: { host: 'localhost' } },
+    myEffect
+  )
+);`} />
+
+      <h2>Best Practices</h2>
+      <ul>
+        <li><strong>Never commit <code>.env</code></strong> — Use <code>.env.example</code> as a template</li>
+        <li><strong>Use defaults for development</strong> — Make the app run with zero config locally</li>
+        <li><strong>Validate early</strong> — Use schema validation for critical config values</li>
+        <li><strong>Mask secrets</strong> — Never log passwords or API keys</li>
+        <li><strong>Environment-specific files</strong> — Use <code>.env.production</code> for prod defaults</li>
+        <li><strong>Centralize config</strong> — Keep all config in <code>src/config/index.ts</code></li>
+      </ul>
+    </DocsContent>
   );
 }

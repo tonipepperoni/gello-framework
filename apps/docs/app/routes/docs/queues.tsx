@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { CodeBlock } from '../../components/CodeBlock';
+import { DocsContent, CodeBlock, Callout } from '../../components';
 
 export const Route = createFileRoute('/docs/queues')({
   component: QueuesPage,
@@ -7,18 +7,21 @@ export const Route = createFileRoute('/docs/queues')({
 
 function QueuesPage() {
   return (
-    <article className="prose">
-      <h1>Queues</h1>
-      <p className="text-xl text-zinc-400 mb-8">
-        Pure Effect queues — jobs as values, workers as Layers
-      </p>
-
+    <DocsContent
+      title="Queues"
+      description="Laravel-inspired job queues — implemented with pure Effect primitives"
+    >
       <h2>The Pattern</h2>
       <p>
-        Queues follow the same pattern: <code>Context.Tag</code> for the service,{' '}
-        <code>Layer.scoped</code> for lifecycle management. No external queue dependency —
-        just Effect primitives with Redis or Postgres as the backing store.
+        Gello's queue system takes inspiration from Laravel's elegant job dispatching API,
+        but implements it using Effect's functional patterns. Jobs are values, workers are Layers,
+        and everything is type-safe.
       </p>
+
+      <Callout type="info" title="Pure Effect">
+        Queues use <code>Context.Tag</code> for the service and <code>Layer.scoped</code> for
+        lifecycle management — no external queue dependency required.
+      </Callout>
 
       <h2>Queue Service Layer</h2>
       <CodeBlock code={`import { Context, Effect, Layer, Queue, Fiber } from "effect"
@@ -151,6 +154,7 @@ const MainLayer = pipe(
 )
 
 Layer.launch(MainLayer).pipe(NodeRuntime.runMain)`} />
+
       <CodeBlock lang="bash" code={`npx tsx src/worker.ts`} />
 
       <h2>Typed Job Definitions</h2>
@@ -239,6 +243,6 @@ await Effect.runPromise(
     expect(testQueue.getEnqueued()).toHaveLength(1)
   }).pipe(Effect.provide(testQueue.layer))
 )`} />
-    </article>
+    </DocsContent>
   );
 }

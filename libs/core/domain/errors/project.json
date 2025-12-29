@@ -1,0 +1,8 @@
+{
+  "name": "core-domain-errors",
+  "$schema": "../../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/core/domain/errors/src",
+  "projectType": "library",
+  "tags": ["core", "type:lib", "layer:domain"],
+  "targets": {}
+}

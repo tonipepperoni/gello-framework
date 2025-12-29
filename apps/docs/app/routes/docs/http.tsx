@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { CodeBlock } from '../../components/CodeBlock';
+import { DocsContent, CodeBlock, Callout } from '../../components';
 
 export const Route = createFileRoute('/docs/http')({
   component: HttpPage,
@@ -7,11 +7,14 @@ export const Route = createFileRoute('/docs/http')({
 
 function HttpPage() {
   return (
-    <article className="prose">
-      <h1>HTTP Server</h1>
-      <p className="text-xl text-zinc-400 mb-8">
-        Type-safe routing with @effect/platform — no framework magic
-      </p>
+    <DocsContent
+      title="HTTP Server"
+      description="Functional HTTP layer with @effect/platform — type-safe, composable, resource-managed"
+    >
+      <Callout type="info">
+        Unlike Express or Koa, Gello's HTTP layer is built on Effect's functional patterns.
+        Routes are values, handlers return Effects, and resources are automatically managed.
+      </Callout>
 
       <h2>Setup</h2>
       <CodeBlock lang="bash" code={`pnpm add effect @effect/schema @effect/platform @effect/platform-node`} />
@@ -167,6 +170,6 @@ HttpRouter.get("/users/:id", Effect.gen(function* () {
     HttpServerResponse.json({ error: \`\${e.resource} not found\` }, { status: 404 })
   )
 ))`} />
-    </article>
+    </DocsContent>
   );
 }

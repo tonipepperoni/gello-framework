@@ -1,0 +1,29 @@
+{
+  "name": "@gello/common",
+  "version": "0.1.1",
+  "description": "Common utilities for Gello framework - middleware, routing, validation",
+  "keywords": ["gello", "effect", "typescript", "middleware", "validation"],
+  "author": "Gello Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tonipepperoni/gello-framework"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "peerDependencies": {
+    "effect": "^3.19.0",
+    "@gello/core": "^0.1.0"
+  }
+}

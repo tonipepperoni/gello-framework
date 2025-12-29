@@ -31,7 +31,9 @@
   "plugins": [
     {
       "plugin": "@nx/vite/plugin",
-      "exclude": ["apps/docs/**"],
+      "exclude": [
+        "apps/docs/**"
+      ],
       "options": {
         "buildTargetName": "build",
         "testTargetName": "test",
@@ -43,35 +45,64 @@
       "plugin": "@nx/eslint/plugin",
       "options": {
         "targetName": "lint",
-        "extensions": ["ts", "tsx", "js", "jsx", "json"]
+        "extensions": [
+          "ts",
+          "tsx",
+          "js",
+          "jsx",
+          "json"
+        ]
       }
     }
   ],
   "targetDefaults": {
     "build": {
-      "dependsOn": ["^build"],
+      "dependsOn": [
+        "^build"
+      ],
       "cache": true,
-      "inputs": ["production", "^production"],
-      "outputs": ["{projectRoot}/dist"]
+      "inputs": [
+        "production",
+        "^production"
+      ],
+      "outputs": [
+        "{projectRoot}/dist"
+      ]
     },
     "test": {
       "cache": true,
-      "inputs": ["default", "^production"]
+      "inputs": [
+        "default",
+        "^production"
+      ]
     },
     "typecheck": {
-      "dependsOn": ["^typecheck"],
+      "dependsOn": [
+        "^typecheck"
+      ],
       "cache": true,
-      "inputs": ["production", "^production"]
+      "inputs": [
+        "production",
+        "^production"
+      ]
     },
     "lint": {
       "cache": true,
-      "inputs": ["default"]
+      "inputs": [
+        "default"
+      ]
     },
     "@nx/esbuild:esbuild": {
       "cache": true,
-      "dependsOn": ["^build"],
-      "inputs": ["production", "^production"]
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "production",
+        "^production"
+      ]
     }
   },
-  "defaultBase": "main"
+  "defaultBase": "main",
+  "nxCloudId": "69513ad4d0cf5f72ac56a483"
 }

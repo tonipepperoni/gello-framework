@@ -1,0 +1,8 @@
+{
+  "name": "core-adapters-logger",
+  "$schema": "../../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/core/adapters/logger/src",
+  "projectType": "library",
+  "tags": ["core", "type:lib", "layer:adapters"],
+  "targets": {}
+}

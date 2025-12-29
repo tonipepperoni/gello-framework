@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { CodeBlock } from '../../components/CodeBlock';
+import { DocsContent, CodeBlock, Callout } from '../../components';
 
 export const Route = createFileRoute('/docs/dependency-injection')({
   component: DependencyInjectionPage,
@@ -7,16 +7,16 @@ export const Route = createFileRoute('/docs/dependency-injection')({
 
 function DependencyInjectionPage() {
   return (
-    <article className="prose">
-      <h1>Dependency Injection</h1>
-      <p className="text-xl text-zinc-400 mb-8">
-        Context.Tag + Layer — no container, no decorators, just composition
-      </p>
-
+    <DocsContent
+      title="Dependency Injection"
+      description="Context.Tag + Layer — NestJS-style modularity with functional composition"
+    >
       <h2>The Pattern</h2>
       <p>
-        Effect's DI is based on two primitives: <code>Context.Tag</code> to define service interfaces,
-        and <code>Layer</code> to provide implementations. No magic — just types.
+        Gello's dependency injection takes inspiration from NestJS's service-oriented architecture,
+        but implements it using Effect's functional primitives. Instead of decorators and a runtime
+        container, you get <code>Context.Tag</code> to define service interfaces
+        and <code>Layer</code> to provide implementations — all type-safe and composable.
       </p>
 
       <h2>Defining Services</h2>
@@ -78,6 +78,11 @@ const UserRepoWithDeps = UserRepoLive.pipe(
 )`} />
 
       <h2>Scoped Resources</h2>
+      <Callout type="info" title="Resource Lifecycle">
+        Use <code>Layer.scoped</code> with <code>acquireRelease</code> for resources that need cleanup,
+        like database pools and Redis connections.
+      </Callout>
+
       <CodeBlock code={`import { Pool } from "pg"
 
 // Layer.scoped — for resources that need cleanup
@@ -177,6 +182,6 @@ await Effect.runPromise(
         <li>Testing is trivial — swap any Layer</li>
         <li>Resource lifecycle is guaranteed by Effect</li>
       </ul>
-    </article>
+    </DocsContent>
   );
 }

@@ -1,0 +1,8 @@
+{
+  "name": "core-contracts",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/core/contracts/src",
+  "projectType": "library",
+  "tags": ["core", "type:lib", "layer:contracts"],
+  "targets": {}
+}

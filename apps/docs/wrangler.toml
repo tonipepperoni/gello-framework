@@ -1,0 +1,7 @@
+name = "gello-docs"
+compatibility_date = "2024-12-29"
+compatibility_flags = ["nodejs_compat"]
+main = "@tanstack/react-start/server-entry"
+
+[observability]
+enabled = true

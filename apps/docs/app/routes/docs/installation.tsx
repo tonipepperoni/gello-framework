@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { CodeBlock } from '../../components/CodeBlock';
+import { DocsContent, CodeBlock, Callout, Tabs, Tab } from '../../components';
 
 export const Route = createFileRoute('/docs/installation')({
   component: InstallationPage,
@@ -7,23 +7,102 @@ export const Route = createFileRoute('/docs/installation')({
 
 function InstallationPage() {
   return (
-    <article className="prose">
-      <h1>Installation</h1>
-      <p className="text-xl text-zinc-400 mb-8">
-        Effect + @effect/platform — everything you need
+    <DocsContent
+      title="Installation"
+      description="Get started with Gello in seconds using the CLI"
+    >
+      <h2>Quick Start (Recommended)</h2>
+      <p>
+        The fastest way to create a new Gello project is using the CLI:
+      </p>
+      <CodeBlock lang="bash" code={`npx gello new my-app
+cd my-app
+pnpm install
+pnpm dev`} />
+
+      <Callout type="info" title="What gets scaffolded?">
+        This creates a complete project with Effect, HTTP server, and example routes — ready to go.
+      </Callout>
+
+      <h2>Manual Installation</h2>
+      <p>
+        If you prefer to add Gello to an existing project, install the packages directly:
       </p>
 
-      <h2>Core Dependencies</h2>
-      <CodeBlock lang="bash" code={`pnpm add effect @effect/schema @effect/platform @effect/platform-node`} />
+      <h3>Core Packages</h3>
+      <Tabs items={['pnpm', 'npm', 'yarn']}>
+        <Tab value="pnpm">
+          <CodeBlock lang="bash" code={`# Core framework
+pnpm add @gello/core @gello/common @gello/platform-node
 
-      <h2>Database (Drizzle + Postgres)</h2>
+# Effect runtime (peer dependencies)
+pnpm add effect @effect/platform @effect/platform-node @effect/schema`} />
+        </Tab>
+        <Tab value="npm">
+          <CodeBlock lang="bash" code={`# Core framework
+npm install @gello/core @gello/common @gello/platform-node
+
+# Effect runtime (peer dependencies)
+npm install effect @effect/platform @effect/platform-node @effect/schema`} />
+        </Tab>
+        <Tab value="yarn">
+          <CodeBlock lang="bash" code={`# Core framework
+yarn add @gello/core @gello/common @gello/platform-node
+
+# Effect runtime (peer dependencies)
+yarn add effect @effect/platform @effect/platform-node @effect/schema`} />
+        </Tab>
+      </Tabs>
+
+      <h3>Optional Packages</h3>
+      <CodeBlock lang="bash" code={`# Queue system
+pnpm add @gello/queue
+
+# Functional programming utilities (optics, refined types)
+pnpm add @gello/fp
+
+# Testing utilities
+pnpm add -D @gello/testing`} />
+
+      <h3>Database (Drizzle + Postgres)</h3>
       <CodeBlock lang="bash" code={`pnpm add drizzle-orm pg
 pnpm add -D drizzle-kit @types/pg`} />
 
-      <h2>Cache (Redis)</h2>
-      <CodeBlock lang="bash" code={`pnpm add ioredis
-pnpm add -D @types/ioredis`} />
-
+      <h2>Package Overview</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Package</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>@gello/core</code></td>
+            <td>Core contracts, errors, and base types</td>
+          </tr>
+          <tr>
+            <td><code>@gello/common</code></td>
+            <td>Middleware, routing, validation utilities</td>
+          </tr>
+          <tr>
+            <td><code>@gello/platform-node</code></td>
+            <td>Node.js HTTP adapter</td>
+          </tr>
+          <tr>
+            <td><code>@gello/queue</code></td>
+            <td>Effect-native queue system</td>
+          </tr>
+          <tr>
+            <td><code>@gello/fp</code></td>
+            <td>Optics, refined types, FP utilities</td>
+          </tr>
+          <tr>
+            <td><code>@gello/testing</code></td>
+            <td>Testing utilities and mocks</td>
+          </tr>
+        </tbody>
+      </table>
 
       <h2>Project Structure</h2>
       <CodeBlock lang="text" code={`src/
@@ -44,8 +123,8 @@ pnpm add -D @types/ioredis`} />
   "compilerOptions": {
     "strict": true,
     "exactOptionalPropertyTypes": true,
-    "moduleResolution": "bundler",
-    "module": "ESNext",
+    "moduleResolution": "NodeNext",
+    "module": "NodeNext",
     "target": "ES2022",
     "lib": ["ES2022"],
     "esModuleInterop": true,
@@ -74,8 +153,12 @@ const MainLayer = pipe(
 
 Layer.launch(MainLayer).pipe(NodeRuntime.runMain)`} />
 
-      <h2>Run</h2>
-      <CodeBlock lang="bash" code={`npx tsx src/main.ts`} />
-    </article>
+      <h2>Development</h2>
+      <CodeBlock lang="bash" code={`# Start development server with hot reload
+pnpm dev
+
+# Or using the CLI
+npx gello serve`} />
+    </DocsContent>
   );
 }

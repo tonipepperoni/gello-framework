@@ -1,17 +1,23 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router';
-import { Sidebar } from '../components/Sidebar';
+import { DocsLayout } from 'fumadocs-ui/layouts/docs';
+import { baseOptions } from '../lib/layout.shared';
+import { pageTree } from '../lib/source';
 
 export const Route = createFileRoute('/docs')({
-  component: DocsLayout,
+  component: DocsLayoutWrapper,
 });
 
-function DocsLayout() {
+function DocsLayoutWrapper() {
   return (
-    <div className="flex max-w-7xl mx-auto">
-      <Sidebar />
-      <main className="flex-1 min-w-0 p-8">
-        <Outlet />
-      </main>
-    </div>
+    <DocsLayout
+      {...baseOptions()}
+      tree={pageTree}
+      sidebar={{
+        defaultOpenLevel: 1,
+        collapsible: true,
+      }}
+    >
+      <Outlet />
+    </DocsLayout>
   );
 }

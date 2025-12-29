@@ -10,8 +10,8 @@
     "test:watch": "nx run-many -t test:watch",
     "lint": "nx run-many -t lint",
     "typecheck": "nx run-many -t typecheck",
-    "dev": "nx run todo-app:dev",
-    "gello": "node tools/cli/dist/gello.js"
+    "dev": "nx run todo:dev",
+    "gello": "nx run cli:serve --"
   },
   "dependencies": {
     "@effect/cli": "^0.73.0",
@@ -48,11 +48,14 @@
     "esbuild": "^0.24.2",
     "eslint": "^9.17.0",
     "eslint-config-prettier": "^10.0.0",
+    "eslint-plugin-boundaries": "^5.3.1",
     "jiti": "2.4.2",
     "jsdom": "~22.1.0",
     "jsonc-eslint-parser": "^2.1.0",
     "nx": "^20.2.2",
     "prettier": "^3.4.2",
+    "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.21.0",
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.19.0",
     "vite": "^6.0.6",

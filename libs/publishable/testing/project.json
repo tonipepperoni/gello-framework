@@ -1,0 +1,17 @@
+{
+  "name": "gello-testing",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/publishable/testing/src",
+  "projectType": "library",
+  "tags": ["scope:public", "type:lib"],
+  "targets": {
+    "publish": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "command": "npm publish --access public",
+        "cwd": "libs/publishable/testing"
+      }
+    }
+  }
+}

@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { CodeBlock } from '../../components/CodeBlock';
+import { DocsContent, CodeBlock, Callout } from '../../components';
 
 export const Route = createFileRoute('/docs/')({
   component: DocsIntroduction,
@@ -7,20 +7,35 @@ export const Route = createFileRoute('/docs/')({
 
 function DocsIntroduction() {
   return (
-    <article className="prose">
-      <h1>Introduction</h1>
-      <p className="text-xl text-zinc-400 mb-8">
-        Gello — FP-core backend framework built on Effect
+    <DocsContent
+      title="Introduction"
+      description="Gello — A TypeScript backend framework built on Effect, inspired by Laravel, Rails, and NestJS"
+    >
+      <p>
+        Gello is a sophisticated backend framework that combines the best ideas from established frameworks
+        with Effect's functional programming paradigm:
       </p>
 
+      <ul>
+        <li><strong>Laravel's Developer Experience</strong> — Elegant APIs, powerful CLI, sensible defaults</li>
+        <li><strong>Ruby on Rails' Philosophy</strong> — Convention over configuration, developer productivity</li>
+        <li><strong>NestJS's Modularity</strong> — Service-oriented architecture, clean dependency injection</li>
+        <li><strong>Effect's Type Safety</strong> — Functional programming, compile-time error handling</li>
+      </ul>
+
       <p>
-        Gello is a non-modular, purely functional approach to backend development in TypeScript.
         Built on <a href="https://effect.website" target="_blank" rel="noopener noreferrer">Effect</a> and{' '}
         <a href="https://github.com/Effect-TS/effect/tree/main/packages/platform" target="_blank" rel="noopener noreferrer">@effect/platform</a>,
-        it follows the principle: <strong>program = value, interpret at the edge</strong>.
+        Gello follows the principle: <strong>program = value, interpret at the edge</strong>.
       </p>
 
       <h2>Core Philosophy</h2>
+
+      <Callout type="info" title="The Gello Way">
+        Build applications as pure values, compose them with Layers, and interpret at the edge.
+        No magic, no hidden state, just functions and types.
+      </Callout>
+
       <ul>
         <li><strong>No Module Abstraction</strong>: Just compose Layers for dependencies and handlers that <code>yield*</code> from context</li>
         <li><strong>Scoped Resources</strong>: Database pools, Redis connections — all managed with <code>Layer.scoped</code> and <code>acquireRelease</code></li>
@@ -29,7 +44,7 @@ function DocsIntroduction() {
       </ul>
 
       <h2>Quick Example</h2>
-      <CodeBlock code={`import { Context, Effect, Layer, pipe } from "effect"
+      <CodeBlock lang="typescript" code={`import { Context, Effect, Layer, pipe } from "effect"
 import * as S from "@effect/schema/Schema"
 import * as HttpRouter from "@effect/platform/HttpRouter"
 import * as HttpServer from "@effect/platform/HttpServer"
@@ -84,12 +99,29 @@ Layer.launch(MainLayer).pipe(NodeRuntime.runMain)`} />
         <li><strong>No Magic</strong>: It's just functions and values, all the way down</li>
       </ul>
 
+      <h2>Quick Start</h2>
+      <CodeBlock lang="bash" code={`npx gello new my-app
+cd my-app
+pnpm install
+pnpm dev`} />
+
+      <h2>Packages</h2>
+      <p>Gello is organized into focused packages:</p>
+      <ul>
+        <li><code>@gello/core</code> — Core contracts, errors, and base types</li>
+        <li><code>@gello/common</code> — Middleware, routing, validation utilities</li>
+        <li><code>@gello/platform-node</code> — Node.js HTTP adapter</li>
+        <li><code>@gello/queue</code> — Effect-native queue system</li>
+        <li><code>@gello/fp</code> — Optics, refined types, FP utilities</li>
+        <li><code>@gello/testing</code> — Testing utilities and mocks</li>
+      </ul>
+
       <h2>Requirements</h2>
       <ul>
         <li><strong>Node.js</strong> 20.0+</li>
         <li><strong>TypeScript</strong> 5.4+</li>
         <li><strong>Effect</strong> 3.x</li>
       </ul>
-    </article>
+    </DocsContent>
   );
 }

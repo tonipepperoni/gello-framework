@@ -1,138 +1,207 @@
 <p align="center">
-  <img src="apps/docs/public/logo.svg" width="120" alt="Gello Logo">
+  <pre align="center">
+ ██████╗ ███████╗██╗     ██╗      ██████╗
+██╔════╝ ██╔════╝██║     ██║     ██╔═══██╗
+██║  ███╗█████╗  ██║     ██║     ██║   ██║
+██║   ██║██╔══╝  ██║     ██║     ██║   ██║
+╚██████╔╝███████╗███████╗███████╗╚██████╔╝
+ ╚═════╝ ╚══════╝╚══════╝╚══════╝ ╚═════╝
+  </pre>
 </p>
 
 <p align="center">
-  <a href="https://github.com/gello/gello/actions"><img src="https://img.shields.io/github/actions/workflow/status/gello/gello/tests.yml?branch=main&style=flat-square" alt="Build Status"></a>
-  <a href="https://www.npmjs.com/package/@gello/core-http"><img src="https://img.shields.io/npm/v/@gello/core-http?style=flat-square" alt="Latest Version"></a>
-  <a href="https://www.npmjs.com/package/@gello/core-http"><img src="https://img.shields.io/npm/dm/@gello/core-http?style=flat-square" alt="Downloads"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/npm/l/@gello/core-http?style=flat-square" alt="License"></a>
+  <strong>A TypeScript backend framework built on Effect</strong>
 </p>
 
-## About Gello
+<p align="center">
+  <a href="https://www.npmjs.com/package/@gello/core"><img src="https://img.shields.io/npm/v/@gello/core?style=flat-square" alt="Latest Version"></a>
+  <a href="https://www.npmjs.com/package/gello"><img src="https://img.shields.io/npm/dm/gello?style=flat-square" alt="Downloads"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/npm/l/@gello/core?style=flat-square" alt="License"></a>
+</p>
 
-Gello is a sophisticated TypeScript backend framework powered by [Effect](https://effect.website). It combines the developer experience of Laravel with the type safety and composability of functional programming.
+<p align="center">
+  <a href="https://gello.net/docs">Documentation</a> •
+  <a href="https://gello.net/docs/installation">Installation</a> •
+  <a href="https://gello.net/docs/cli">CLI</a>
+</p>
 
-- **Effect-Powered Architecture**: Built on Effect for type-safe error handling, dependency injection, and composable design.
-- **Express-like Routing**: Familiar HTTP API with full TypeScript inference.
-- **Laravel-like DI**: Service providers and dependency injection using Effect's Layer system.
-- **Type-Safe Database**: Drizzle ORM integration with Effect for fully typed queries.
-- **Background Jobs**: Queue system with multiple drivers, retries, and job chaining.
-- **CLI Tooling**: Artisan-style commands for scaffolding and migrations.
+---
 
-## Learning Gello
+## Why Gello?
 
-Gello has extensive [documentation](https://gello.dev/docs) covering every aspect of the framework. Whether you're new to Effect or an experienced TypeScript developer, you'll find everything you need to get started.
-
-You may also try the [Gello Bootcamp](https://bootcamp.gello.dev), which guides you through building a modern application with Gello from scratch.
-
-## Installation
-
-```bash
-npm create gello@latest my-app
-cd my-app
-npm run dev
-```
-
-## Quick Example
+Gello combines the **developer experience of Laravel** with the **type safety of Effect**. No decorators, no magic—just functions and values.
 
 ```typescript
-import { Gello, Route } from '@gello/core-http'
-import { Effect } from 'effect'
-
-// Define routes with full type inference
-const hello = Route.get('/hello/:name', (req) =>
-  Effect.succeed({ message: `Hello, ${req.params.name}!` })
-)
-
-// Create and start the application
-const app = Gello.create().use(hello)
-
-app.listen(3000, () => {
-  console.log('Server running on http://localhost:3000')
-})
-```
-
-## Dependency Injection
-
-```typescript
-import { Effect, Layer } from 'effect'
-
 // Define a service
-export class UserService extends Effect.Service<UserService>()('UserService', {
-  effect: Effect.gen(function* () {
-    const db = yield* DrizzleService
-    return {
-      findById: (id: string) => db.query(/* ... */),
-      create: (data: CreateUserDto) => db.query(/* ... */),
-    }
-  }),
-}) {}
+class UserRepo extends Context.Tag("UserRepo")<UserRepo, {
+  findById: (id: string) => Effect.Effect<User, NotFoundError>
+}>() {}
 
-// Use in routes
-const getUser = Route.get('/users/:id', (req) =>
-  Effect.gen(function* () {
-    const userService = yield* UserService
-    return yield* userService.findById(req.params.id)
-  })
-)
+// Use it in a route
+HttpRouter.get("/users/:id", Effect.gen(function* () {
+  const { id } = yield* HttpRouter.params
+  const repo = yield* UserRepo
+  const user = yield* repo.findById(id)
+  return yield* HttpServerResponse.json(user)
+}))
 ```
 
-## Background Jobs
+**What you get:**
+- Compile-time error tracking — know exactly what can fail
+- Automatic dependency injection — `yield*` from context
+- Resource safety — connections close, pools drain
+- Testability — swap any Layer for a mock
 
-```typescript
-import { Job, Queue } from '@gello/queue-core'
-
-// Define a job
-export const SendWelcomeEmail = Job.define(
-  'send-welcome-email',
-  (payload: { userId: string; email: string }) =>
-    Effect.gen(function* () {
-      const emailService = yield* EmailService
-      yield* emailService.sendWelcome(payload)
-    })
-)
-
-// Dispatch from a route
-const createUser = Route.post('/users', (req) =>
-  Effect.gen(function* () {
-    const queue = yield* Queue
-    const user = yield* createUserInDb(req.body)
-    yield* queue.dispatch(SendWelcomeEmail, { userId: user.id, email: user.email })
-    return user
-  })
-)
-```
-
-## CLI Commands
+## Quick Start
 
 ```bash
-# Scaffolding
-pnpm gello make:controller UserController
-pnpm gello make:service UserService
-pnpm gello make:job SendNotification
-
-# Database
-pnpm gello migrate:make create_users_table
-pnpm gello migrate
-
-# Queue
-pnpm gello queue:work
-pnpm gello queue:status
+npx gello new my-app
+cd my-app
+pnpm install
+pnpm dev
 ```
+
+Your server is running at `http://localhost:3000`.
+
+## Features
+
+| Feature | Description |
+|---------|-------------|
+| **Effect Core** | Type-safe errors, dependency injection, resource management |
+| **HTTP Server** | Built on `@effect/platform` with typed routing and middleware |
+| **Validation** | Schema validation with `@effect/schema` at boundaries |
+| **Database** | Drizzle ORM with Effect-managed connection pools |
+| **Queues** | Pure Effect job queues — no Redis required |
+| **FP Utilities** | Optics (lenses), refined types, branded values |
+| **CLI** | Project scaffolding, dev server, route inspection |
+
+## Packages
+
+```bash
+# Core framework
+pnpm add @gello/core @gello/common @gello/platform-node
+
+# Optional
+pnpm add @gello/queue      # Job queues
+pnpm add @gello/fp         # Optics, refined types
+pnpm add -D @gello/testing # Test utilities
+```
+
+| Package | Description |
+|---------|-------------|
+| `@gello/core` | Contracts, errors, base types |
+| `@gello/common` | Middleware, routing, validation |
+| `@gello/platform-node` | Node.js HTTP adapter |
+| `@gello/queue` | Effect-native queue system |
+| `@gello/fp` | Optics, refined types |
+| `@gello/testing` | Mocks and test utilities |
+
+## Example
+
+```typescript
+import { Effect, Layer, pipe } from "effect"
+import * as HttpRouter from "@effect/platform/HttpRouter"
+import * as HttpServer from "@effect/platform/HttpServer"
+import * as HttpServerResponse from "@effect/platform/HttpServerResponse"
+import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer"
+import * as NodeRuntime from "@effect/platform-node/NodeRuntime"
+import { createServer } from "node:http"
+
+// Routes as values
+const routes = pipe(
+  HttpRouter.empty,
+  HttpRouter.get("/", Effect.succeed(HttpServerResponse.json({ status: "ok" }))),
+  HttpRouter.get("/users/:id", Effect.gen(function* () {
+    const { id } = yield* HttpRouter.params
+    return yield* HttpServerResponse.json({ id })
+  }))
+)
+
+// Compose and launch
+const server = pipe(
+  HttpServer.serve(HttpRouter.toHttpApp(routes)),
+  Layer.provide(NodeHttpServer.layer(createServer, { port: 3000 }))
+)
+
+Layer.launch(server).pipe(NodeRuntime.runMain)
+```
+
+## CLI
+
+```bash
+npx gello new my-app      # Create new project
+npx gello serve           # Start dev server with hot reload
+npx gello route:list      # Display registered routes
+```
+
+The `route:list` command shows a beautiful TUI:
+
+```
+ ██████╗ ███████╗██╗     ██╗      ██████╗
+██╔════╝ ██╔════╝██║     ██║     ██╔═══██╗
+██║  ███╗█████╗  ██║     ██║     ██║   ██║
+██║   ██║██╔══╝  ██║     ██║     ██║   ██║
+╚██████╔╝███████╗███████╗███████╗╚██████╔╝
+ ╚═════╝ ╚══════╝╚══════╝╚══════╝ ╚═════╝
+
+Route List • My App
+
+Total: 5 routes  │  GET: 3  POST: 1  DELETE: 1
+
+METHOD    PATH              HANDLER
+────────────────────────────────────
+GET       /                 index
+GET       /users            listUsers
+GET       /users/:id        getUser
+POST      /users            createUser
+DELETE    /users/:id        deleteUser
+```
+
+## Architecture
+
+Gello follows **hexagonal architecture** with Effect's Layer system:
+
+```
+┌─────────────────────────────────────┐
+│            Your App                 │
+│  (Routes, Handlers, Business Logic) │
+└──────────────┬──────────────────────┘
+               │ yield*
+┌──────────────▼──────────────────────┐
+│           Services                  │
+│  (UserRepo, EmailService, etc.)     │
+│  Context.Tag + Layer                │
+└──────────────┬──────────────────────┘
+               │ Layer.provide
+┌──────────────▼──────────────────────┐
+│          Infrastructure             │
+│  (Database, Cache, Queue, HTTP)     │
+│  Layer.scoped + acquireRelease      │
+└─────────────────────────────────────┘
+               │
+         Layer.launch
+```
+
+Everything composes at the edge. No hidden state, no runtime surprises.
+
+## Documentation
+
+Full documentation at **[gello.net/docs](https://gello.net/docs)**
+
+- [Installation](https://gello.net/docs/installation)
+- [HTTP Server](https://gello.net/docs/http)
+- [Routing](https://gello.net/docs/routing)
+- [Middleware](https://gello.net/docs/middleware)
+- [Dependency Injection](https://gello.net/docs/dependency-injection)
+- [Validation](https://gello.net/docs/validation)
+- [Database](https://gello.net/docs/database)
+- [Queues](https://gello.net/docs/queues)
+- [CLI](https://gello.net/docs/cli)
 
 ## Contributing
 
-Thank you for considering contributing to Gello! The contribution guide can be found in the [documentation](https://gello.dev/docs/contributing).
-
-## Code of Conduct
-
-In order to ensure that the Gello community is welcoming to all, please review and abide by the [Code of Conduct](https://gello.dev/docs/code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Gello, please send an e-mail to security@gello.dev. All security vulnerabilities will be promptly addressed.
+Contributions welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-The Gello framework is open-sourced software licensed under the [MIT license](LICENSE).
+MIT License. See [LICENSE](LICENSE) for details.

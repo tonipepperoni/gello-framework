@@ -1,0 +1,17 @@
+{
+  "name": "gello-core",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/publishable/core/src",
+  "projectType": "library",
+  "tags": ["scope:public", "type:lib"],
+  "targets": {
+    "publish": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "command": "npm publish --access public",
+        "cwd": "libs/publishable/core"
+      }
+    }
+  }
+}

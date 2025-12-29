@@ -1,0 +1,29 @@
+{
+  "name": "@gello/core",
+  "version": "0.1.1",
+  "description": "Core module for Gello framework - contracts, errors, base types",
+  "keywords": ["gello", "effect", "typescript", "backend", "framework"],
+  "author": "Gello Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tonipepperoni/gello-framework"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "peerDependencies": {
+    "effect": "^3.19.0",
+    "@effect/platform": "^0.94.0"
+  }
+}

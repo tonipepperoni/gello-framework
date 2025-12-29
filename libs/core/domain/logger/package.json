@@ -1,0 +1,17 @@
+{
+  "name": "@gello/domain-logger",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./src/index.js",
+      "types": "./src/index.d.ts"
+    }
+  },
+  "dependencies": {
+    "@gello/core-contracts": "workspace:*",
+    "effect": "^3.15.2"
+  }
+}

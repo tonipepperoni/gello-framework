@@ -1,6 +1,6 @@
 import type { PageTree } from 'fumadocs-core/server';
 
-// Page tree aligned with content/docs/meta.json
+// Page tree for sidebar navigation
 export const pageTree: PageTree.Root = {
   name: 'Documentation',
   children: [
@@ -27,6 +27,7 @@ export const pageTree: PageTree.Root = {
       name: 'Features',
     },
     { type: 'page', name: 'Database', url: '/docs/database' },
+    { type: 'page', name: 'Storage', url: '/docs/storage' },
     { type: 'page', name: 'Queues', url: '/docs/queues' },
     { type: 'page', name: 'Caching', url: '/docs/caching' },
     { type: 'page', name: 'Logger', url: '/docs/logger' },
@@ -39,8 +40,25 @@ export const pageTree: PageTree.Root = {
   ],
 };
 
+// Map slug to page info
+export interface PageInfo {
+  title: string;
+  description?: string;
+  slug: string;
+}
+
+// Get all page slugs for static generation
+export function getPageSlugs(): string[] {
+  return pageTree.children
+    .filter((item): item is PageTree.Item & { type: 'page' } => item.type === 'page')
+    .map((item) => {
+      const slug = item.url.replace('/docs/', '').replace('/docs', '');
+      return slug || 'index';
+    });
+}
+
 // Get all pages (flatten tree, exclude separators)
-function getPages(): Array<{ name: string; url: string }> {
+export function getPages(): Array<{ name: string; url: string }> {
   return pageTree.children
     .filter((item): item is PageTree.Item & { type: 'page' } => item.type === 'page')
     .map((item) => ({ name: item.name, url: item.url }));
@@ -60,4 +78,13 @@ export function getPageNavigation(currentUrl: string): {
     previous: currentIndex > 0 ? pages[currentIndex - 1] : undefined,
     next: currentIndex < pages.length - 1 ? pages[currentIndex + 1] : undefined,
   };
+}
+
+// Get page title from URL
+export function getPageTitle(url: string): string {
+  const page = pageTree.children.find(
+    (item): item is PageTree.Item & { type: 'page' } =>
+      item.type === 'page' && item.url === url
+  );
+  return page?.name ?? 'Documentation';
 }

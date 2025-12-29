@@ -3,3 +3,8 @@
  */
 export { routeListCommand, discoverRoutes } from './commands/route-list.js';
 export { RouteList, type RouteInfo, type RouteListProps } from './components/RouteList.js';
+export {
+  storageCommand,
+  storageConfigCommand,
+  type StorageCommandOptions,
+} from './commands/storage.js';

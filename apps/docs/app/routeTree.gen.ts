@@ -12,21 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as DocsRouteImport } from './routes/docs'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DocsIndexRouteImport } from './routes/docs/index'
-import { Route as DocsValidationRouteImport } from './routes/docs/validation'
-import { Route as DocsTimeRouteImport } from './routes/docs/time'
-import { Route as DocsRoutingRouteImport } from './routes/docs/routing'
-import { Route as DocsQueuesRouteImport } from './routes/docs/queues'
-import { Route as DocsMiddlewareRouteImport } from './routes/docs/middleware'
-import { Route as DocsLoggerRouteImport } from './routes/docs/logger'
-import { Route as DocsInstallationRouteImport } from './routes/docs/installation'
-import { Route as DocsHttpRouteImport } from './routes/docs/http'
-import { Route as DocsErrorHandlingRouteImport } from './routes/docs/error-handling'
-import { Route as DocsDirectoryStructureRouteImport } from './routes/docs/directory-structure'
-import { Route as DocsDependencyInjectionRouteImport } from './routes/docs/dependency-injection'
-import { Route as DocsDatabaseRouteImport } from './routes/docs/database'
-import { Route as DocsConfigurationRouteImport } from './routes/docs/configuration'
-import { Route as DocsCliRouteImport } from './routes/docs/cli'
-import { Route as DocsCachingRouteImport } from './routes/docs/caching'
+import { Route as DocsSlugRouteImport } from './routes/docs/$slug'
 
 const DocsRoute = DocsRouteImport.update({
   id: '/docs',
@@ -43,202 +29,36 @@ const DocsIndexRoute = DocsIndexRouteImport.update({
   path: '/',
   getParentRoute: () => DocsRoute,
 } as any)
-const DocsValidationRoute = DocsValidationRouteImport.update({
-  id: '/validation',
-  path: '/validation',
-  getParentRoute: () => DocsRoute,
-} as any)
-const DocsTimeRoute = DocsTimeRouteImport.update({
-  id: '/time',
-  path: '/time',
-  getParentRoute: () => DocsRoute,
-} as any)
-const DocsRoutingRoute = DocsRoutingRouteImport.update({
-  id: '/routing',
-  path: '/routing',
-  getParentRoute: () => DocsRoute,
-} as any)
-const DocsQueuesRoute = DocsQueuesRouteImport.update({
-  id: '/queues',
-  path: '/queues',
-  getParentRoute: () => DocsRoute,
-} as any)
-const DocsMiddlewareRoute = DocsMiddlewareRouteImport.update({
-  id: '/middleware',
-  path: '/middleware',
-  getParentRoute: () => DocsRoute,
-} as any)
-const DocsLoggerRoute = DocsLoggerRouteImport.update({
-  id: '/logger',
-  path: '/logger',
-  getParentRoute: () => DocsRoute,
-} as any)
-const DocsInstallationRoute = DocsInstallationRouteImport.update({
-  id: '/installation',
-  path: '/installation',
-  getParentRoute: () => DocsRoute,
-} as any)
-const DocsHttpRoute = DocsHttpRouteImport.update({
-  id: '/http',
-  path: '/http',
-  getParentRoute: () => DocsRoute,
-} as any)
-const DocsErrorHandlingRoute = DocsErrorHandlingRouteImport.update({
-  id: '/error-handling',
-  path: '/error-handling',
-  getParentRoute: () => DocsRoute,
-} as any)
-const DocsDirectoryStructureRoute = DocsDirectoryStructureRouteImport.update({
-  id: '/directory-structure',
-  path: '/directory-structure',
-  getParentRoute: () => DocsRoute,
-} as any)
-const DocsDependencyInjectionRoute = DocsDependencyInjectionRouteImport.update({
-  id: '/dependency-injection',
-  path: '/dependency-injection',
-  getParentRoute: () => DocsRoute,
-} as any)
-const DocsDatabaseRoute = DocsDatabaseRouteImport.update({
-  id: '/database',
-  path: '/database',
-  getParentRoute: () => DocsRoute,
-} as any)
-const DocsConfigurationRoute = DocsConfigurationRouteImport.update({
-  id: '/configuration',
-  path: '/configuration',
-  getParentRoute: () => DocsRoute,
-} as any)
-const DocsCliRoute = DocsCliRouteImport.update({
-  id: '/cli',
-  path: '/cli',
-  getParentRoute: () => DocsRoute,
-} as any)
-const DocsCachingRoute = DocsCachingRouteImport.update({
-  id: '/caching',
-  path: '/caching',
+const DocsSlugRoute = DocsSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
   getParentRoute: () => DocsRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/docs': typeof DocsRouteWithChildren
-  '/docs/caching': typeof DocsCachingRoute
-  '/docs/cli': typeof DocsCliRoute
-  '/docs/configuration': typeof DocsConfigurationRoute
-  '/docs/database': typeof DocsDatabaseRoute
-  '/docs/dependency-injection': typeof DocsDependencyInjectionRoute
-  '/docs/directory-structure': typeof DocsDirectoryStructureRoute
-  '/docs/error-handling': typeof DocsErrorHandlingRoute
-  '/docs/http': typeof DocsHttpRoute
-  '/docs/installation': typeof DocsInstallationRoute
-  '/docs/logger': typeof DocsLoggerRoute
-  '/docs/middleware': typeof DocsMiddlewareRoute
-  '/docs/queues': typeof DocsQueuesRoute
-  '/docs/routing': typeof DocsRoutingRoute
-  '/docs/time': typeof DocsTimeRoute
-  '/docs/validation': typeof DocsValidationRoute
+  '/docs/$slug': typeof DocsSlugRoute
   '/docs/': typeof DocsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/docs/caching': typeof DocsCachingRoute
-  '/docs/cli': typeof DocsCliRoute
-  '/docs/configuration': typeof DocsConfigurationRoute
-  '/docs/database': typeof DocsDatabaseRoute
-  '/docs/dependency-injection': typeof DocsDependencyInjectionRoute
-  '/docs/directory-structure': typeof DocsDirectoryStructureRoute
-  '/docs/error-handling': typeof DocsErrorHandlingRoute
-  '/docs/http': typeof DocsHttpRoute
-  '/docs/installation': typeof DocsInstallationRoute
-  '/docs/logger': typeof DocsLoggerRoute
-  '/docs/middleware': typeof DocsMiddlewareRoute
-  '/docs/queues': typeof DocsQueuesRoute
-  '/docs/routing': typeof DocsRoutingRoute
-  '/docs/time': typeof DocsTimeRoute
-  '/docs/validation': typeof DocsValidationRoute
+  '/docs/$slug': typeof DocsSlugRoute
   '/docs': typeof DocsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/docs': typeof DocsRouteWithChildren
-  '/docs/caching': typeof DocsCachingRoute
-  '/docs/cli': typeof DocsCliRoute
-  '/docs/configuration': typeof DocsConfigurationRoute
-  '/docs/database': typeof DocsDatabaseRoute
-  '/docs/dependency-injection': typeof DocsDependencyInjectionRoute
-  '/docs/directory-structure': typeof DocsDirectoryStructureRoute
-  '/docs/error-handling': typeof DocsErrorHandlingRoute
-  '/docs/http': typeof DocsHttpRoute
-  '/docs/installation': typeof DocsInstallationRoute
-  '/docs/logger': typeof DocsLoggerRoute
-  '/docs/middleware': typeof DocsMiddlewareRoute
-  '/docs/queues': typeof DocsQueuesRoute
-  '/docs/routing': typeof DocsRoutingRoute
-  '/docs/time': typeof DocsTimeRoute
-  '/docs/validation': typeof DocsValidationRoute
+  '/docs/$slug': typeof DocsSlugRoute
   '/docs/': typeof DocsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/docs'
-    | '/docs/caching'
-    | '/docs/cli'
-    | '/docs/configuration'
-    | '/docs/database'
-    | '/docs/dependency-injection'
-    | '/docs/directory-structure'
-    | '/docs/error-handling'
-    | '/docs/http'
-    | '/docs/installation'
-    | '/docs/logger'
-    | '/docs/middleware'
-    | '/docs/queues'
-    | '/docs/routing'
-    | '/docs/time'
-    | '/docs/validation'
-    | '/docs/'
+  fullPaths: '/' | '/docs' | '/docs/$slug' | '/docs/'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/docs/caching'
-    | '/docs/cli'
-    | '/docs/configuration'
-    | '/docs/database'
-    | '/docs/dependency-injection'
-    | '/docs/directory-structure'
-    | '/docs/error-handling'
-    | '/docs/http'
-    | '/docs/installation'
-    | '/docs/logger'
-    | '/docs/middleware'
-    | '/docs/queues'
-    | '/docs/routing'
-    | '/docs/time'
-    | '/docs/validation'
-    | '/docs'
-  id:
-    | '__root__'
-    | '/'
-    | '/docs'
-    | '/docs/caching'
-    | '/docs/cli'
-    | '/docs/configuration'
-    | '/docs/database'
-    | '/docs/dependency-injection'
-    | '/docs/directory-structure'
-    | '/docs/error-handling'
-    | '/docs/http'
-    | '/docs/installation'
-    | '/docs/logger'
-    | '/docs/middleware'
-    | '/docs/queues'
-    | '/docs/routing'
-    | '/docs/time'
-    | '/docs/validation'
-    | '/docs/'
+  to: '/' | '/docs/$slug' | '/docs'
+  id: '__root__' | '/' | '/docs' | '/docs/$slug' | '/docs/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -269,149 +89,23 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocsIndexRouteImport
       parentRoute: typeof DocsRoute
     }
-    '/docs/validation': {
-      id: '/docs/validation'
-      path: '/validation'
-      fullPath: '/docs/validation'
-      preLoaderRoute: typeof DocsValidationRouteImport
-      parentRoute: typeof DocsRoute
-    }
-    '/docs/time': {
-      id: '/docs/time'
-      path: '/time'
-      fullPath: '/docs/time'
-      preLoaderRoute: typeof DocsTimeRouteImport
-      parentRoute: typeof DocsRoute
-    }
-    '/docs/routing': {
-      id: '/docs/routing'
-      path: '/routing'
-      fullPath: '/docs/routing'
-      preLoaderRoute: typeof DocsRoutingRouteImport
-      parentRoute: typeof DocsRoute
-    }
-    '/docs/queues': {
-      id: '/docs/queues'
-      path: '/queues'
-      fullPath: '/docs/queues'
-      preLoaderRoute: typeof DocsQueuesRouteImport
-      parentRoute: typeof DocsRoute
-    }
-    '/docs/middleware': {
-      id: '/docs/middleware'
-      path: '/middleware'
-      fullPath: '/docs/middleware'
-      preLoaderRoute: typeof DocsMiddlewareRouteImport
-      parentRoute: typeof DocsRoute
-    }
-    '/docs/logger': {
-      id: '/docs/logger'
-      path: '/logger'
-      fullPath: '/docs/logger'
-      preLoaderRoute: typeof DocsLoggerRouteImport
-      parentRoute: typeof DocsRoute
-    }
-    '/docs/installation': {
-      id: '/docs/installation'
-      path: '/installation'
-      fullPath: '/docs/installation'
-      preLoaderRoute: typeof DocsInstallationRouteImport
-      parentRoute: typeof DocsRoute
-    }
-    '/docs/http': {
-      id: '/docs/http'
-      path: '/http'
-      fullPath: '/docs/http'
-      preLoaderRoute: typeof DocsHttpRouteImport
-      parentRoute: typeof DocsRoute
-    }
-    '/docs/error-handling': {
-      id: '/docs/error-handling'
-      path: '/error-handling'
-      fullPath: '/docs/error-handling'
-      preLoaderRoute: typeof DocsErrorHandlingRouteImport
-      parentRoute: typeof DocsRoute
-    }
-    '/docs/directory-structure': {
-      id: '/docs/directory-structure'
-      path: '/directory-structure'
-      fullPath: '/docs/directory-structure'
-      preLoaderRoute: typeof DocsDirectoryStructureRouteImport
-      parentRoute: typeof DocsRoute
-    }
-    '/docs/dependency-injection': {
-      id: '/docs/dependency-injection'
-      path: '/dependency-injection'
-      fullPath: '/docs/dependency-injection'
-      preLoaderRoute: typeof DocsDependencyInjectionRouteImport
-      parentRoute: typeof DocsRoute
-    }
-    '/docs/database': {
-      id: '/docs/database'
-      path: '/database'
-      fullPath: '/docs/database'
-      preLoaderRoute: typeof DocsDatabaseRouteImport
-      parentRoute: typeof DocsRoute
-    }
-    '/docs/configuration': {
-      id: '/docs/configuration'
-      path: '/configuration'
-      fullPath: '/docs/configuration'
-      preLoaderRoute: typeof DocsConfigurationRouteImport
-      parentRoute: typeof DocsRoute
-    }
-    '/docs/cli': {
-      id: '/docs/cli'
-      path: '/cli'
-      fullPath: '/docs/cli'
-      preLoaderRoute: typeof DocsCliRouteImport
-      parentRoute: typeof DocsRoute
-    }
-    '/docs/caching': {
-      id: '/docs/caching'
-      path: '/caching'
-      fullPath: '/docs/caching'
-      preLoaderRoute: typeof DocsCachingRouteImport
+    '/docs/$slug': {
+      id: '/docs/$slug'
+      path: '/$slug'
+      fullPath: '/docs/$slug'
+      preLoaderRoute: typeof DocsSlugRouteImport
       parentRoute: typeof DocsRoute
     }
   }
 }
 
 interface DocsRouteChildren {
-  DocsCachingRoute: typeof DocsCachingRoute
-  DocsCliRoute: typeof DocsCliRoute
-  DocsConfigurationRoute: typeof DocsConfigurationRoute
-  DocsDatabaseRoute: typeof DocsDatabaseRoute
-  DocsDependencyInjectionRoute: typeof DocsDependencyInjectionRoute
-  DocsDirectoryStructureRoute: typeof DocsDirectoryStructureRoute
-  DocsErrorHandlingRoute: typeof DocsErrorHandlingRoute
-  DocsHttpRoute: typeof DocsHttpRoute
-  DocsInstallationRoute: typeof DocsInstallationRoute
-  DocsLoggerRoute: typeof DocsLoggerRoute
-  DocsMiddlewareRoute: typeof DocsMiddlewareRoute
-  DocsQueuesRoute: typeof DocsQueuesRoute
-  DocsRoutingRoute: typeof DocsRoutingRoute
-  DocsTimeRoute: typeof DocsTimeRoute
-  DocsValidationRoute: typeof DocsValidationRoute
+  DocsSlugRoute: typeof DocsSlugRoute
   DocsIndexRoute: typeof DocsIndexRoute
 }
 
 const DocsRouteChildren: DocsRouteChildren = {
-  DocsCachingRoute: DocsCachingRoute,
-  DocsCliRoute: DocsCliRoute,
-  DocsConfigurationRoute: DocsConfigurationRoute,
-  DocsDatabaseRoute: DocsDatabaseRoute,
-  DocsDependencyInjectionRoute: DocsDependencyInjectionRoute,
-  DocsDirectoryStructureRoute: DocsDirectoryStructureRoute,
-  DocsErrorHandlingRoute: DocsErrorHandlingRoute,
-  DocsHttpRoute: DocsHttpRoute,
-  DocsInstallationRoute: DocsInstallationRoute,
-  DocsLoggerRoute: DocsLoggerRoute,
-  DocsMiddlewareRoute: DocsMiddlewareRoute,
-  DocsQueuesRoute: DocsQueuesRoute,
-  DocsRoutingRoute: DocsRoutingRoute,
-  DocsTimeRoute: DocsTimeRoute,
-  DocsValidationRoute: DocsValidationRoute,
+  DocsSlugRoute: DocsSlugRoute,
   DocsIndexRoute: DocsIndexRoute,
 }
 

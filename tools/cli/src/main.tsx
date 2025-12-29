@@ -15,6 +15,7 @@ import { render, Box, Text } from 'ink';
 import { routeListCommand } from './commands/route-list.js';
 import { newCommand } from './commands/new.js';
 import { serveCommand } from './commands/serve.js';
+import { storageCommand, storageConfigCommand } from './commands/storage.js';
 
 // Gruvbox dark palette
 const gruvbox = {
@@ -110,6 +111,25 @@ const HelpScreen: React.FC<HelpScreenProps> = ({ version }) => (
           <Text color={gruvbox.green}>route:list</Text>
         </Box>
         <Text color={gruvbox.gray}>Display all registered routes</Text>
+      </Box>
+
+      {/* Storage */}
+      <Box marginLeft={2} marginTop={1}>
+        <Text color={gruvbox.aqua} bold>
+          Storage
+        </Text>
+      </Box>
+      <Box marginLeft={4}>
+        <Box width={25}>
+          <Text color={gruvbox.green}>storage</Text>
+        </Box>
+        <Text color={gruvbox.gray}>Show storage configuration status</Text>
+      </Box>
+      <Box marginLeft={4}>
+        <Box width={25}>
+          <Text color={gruvbox.green}>storage:config</Text>
+        </Box>
+        <Text color={gruvbox.gray}>Generate storage config module</Text>
       </Box>
 
       {/* Generators */}
@@ -285,6 +305,14 @@ const main = async () => {
         path: options['path'] as string,
         method: options['method'] as string,
       });
+      break;
+
+    case 'storage':
+      await storageCommand({ command: 'status' });
+      break;
+
+    case 'storage:config':
+      await storageConfigCommand(options['output'] as string);
       break;
 
     default:

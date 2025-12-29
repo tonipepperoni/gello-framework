@@ -3,10 +3,17 @@ compatibility_date = "2024-12-29"
 compatibility_flags = ["nodejs_compat"]
 main = "@tanstack/react-start/server-entry"
 
-routes = [
-  { pattern = "gello.net/*", zone_name = "gello.net" },
-  { pattern = "www.gello.net/*", zone_name = "gello.net" }
-]
+# Enable workers.dev subdomain
+workers_dev = true
+
+# Custom Domains - automatically creates DNS records
+[[routes]]
+pattern = "gello.net"
+custom_domain = true
+
+[[routes]]
+pattern = "www.gello.net"
+custom_domain = true
 
 [observability]
 enabled = true

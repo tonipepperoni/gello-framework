@@ -55,6 +55,8 @@
       "@gello/queue-worker": ["libs/queue/worker/src/index.ts"],
       "@gello/refined": ["libs/fp/refined/src/index.ts"],
       "@gello/resilience": ["libs/core/resilience/src/index.ts"],
+      "@gello/storage": ["libs/storage/core/src/index.ts"],
+      "@gello/storage-drivers": ["libs/storage/drivers/src/index.ts"],
       "@gello/testing": ["libs/publishable/testing/src/index.ts"],
       "@gello/testing-mocks": ["libs/testing/mocks/src/index.ts"],
       "@gello/testing-utilities": ["libs/testing/utilities/src/index.ts"],

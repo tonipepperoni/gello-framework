@@ -1,0 +1,476 @@
+---
+title: Storage
+description: A unified storage abstraction with multiple disk drivers — inspired by Laravel's Filesystem
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+## Overview
+
+Gello's storage system provides a unified API for working with files across multiple
+storage backends. Whether you're storing files locally, in S3, Azure Blob, or Google
+Cloud Storage, the API remains consistent.
+
+<Callout type="info" title="Hexagonal Architecture">
+Storage follows the Ports & Adapters pattern. The `Disk` port defines
+the interface, while drivers like `LocalDisk`, `S3Disk`, and others provide implementations.
+</Callout>
+
+## Installation
+
+```bash
+pnpm add @gello/storage @gello/storage-drivers
+```
+
+For cloud storage providers, install the relevant SDK as a peer dependency:
+
+```bash
+# For S3/R2/MinIO
+pnpm add @aws-sdk/client-s3 @aws-sdk/s3-request-presigner
+
+# For Azure Blob
+pnpm add @azure/storage-blob
+
+# For Google Cloud Storage
+pnpm add @google-cloud/storage
+```
+
+## Basic Usage
+
+```typescript
+import { Effect, Layer } from "effect"
+import { Storage, StorageLive } from "@gello/storage"
+import { LocalDiskLive } from "@gello/storage-drivers"
+
+const program = Effect.gen(function* () {
+  const storage = yield* Storage
+
+  // Write a file
+  yield* storage.put("hello.txt", "Hello, World!")
+
+  // Read a file
+  const content = yield* storage.getString("hello.txt")
+  console.log(content) // "Hello, World!"
+
+  // Check if file exists
+  const exists = yield* storage.exists("hello.txt")
+  console.log(exists) // true
+
+  // Delete a file
+  yield* storage.delete("hello.txt")
+})
+
+// Create the storage layer with local disk
+const LocalStorage = StorageLive.pipe(
+  Layer.provide(LocalDiskLive({ root: "./storage" }))
+)
+
+Effect.runPromise(program.pipe(Effect.provide(LocalStorage)))
+```
+
+## Disk Drivers
+
+Gello provides adapters for popular storage backends out of the box.
+
+### Local Disk
+
+Store files on the local filesystem:
+
+```typescript
+import { LocalDiskLive } from "@gello/storage-drivers"
+
+const LocalStorage = StorageLive.pipe(
+  Layer.provide(LocalDiskLive({
+    root: "./storage",
+    publicUrl: "http://localhost:3000/files",
+    visibility: "private"
+  }))
+)
+```
+
+### S3 Disk
+
+Store files in Amazon S3 or S3-compatible services (R2, MinIO, etc.):
+
+```typescript
+import { S3DiskLive } from "@gello/storage-drivers"
+
+const S3Storage = StorageLive.pipe(
+  Layer.provide(S3DiskLive({
+    bucket: "my-bucket",
+    region: "us-east-1",
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    // For S3-compatible services like R2 or MinIO:
+    // endpoint: "https://xxx.r2.cloudflarestorage.com",
+    // forcePathStyle: true
+  }))
+)
+```
+
+### Azure Disk
+
+Store files in Azure Blob Storage:
+
+```typescript
+import { AzureDiskLive } from "@gello/storage-drivers"
+
+const AzureStorage = StorageLive.pipe(
+  Layer.provide(AzureDiskLive({
+    accountName: "myaccount",
+    accountKey: process.env.AZURE_STORAGE_KEY,
+    container: "my-container"
+  }))
+)
+```
+
+### GCS Disk
+
+Store files in Google Cloud Storage:
+
+```typescript
+import { GCSDiskLive } from "@gello/storage-drivers"
+
+const GCSStorage = StorageLive.pipe(
+  Layer.provide(GCSDiskLive({
+    projectId: "my-project",
+    bucket: "my-bucket",
+    keyFilename: "/path/to/service-account.json"
+  }))
+)
+```
+
+### Memory Disk
+
+In-memory storage for testing:
+
+```typescript
+import { MemoryDiskLive } from "@gello/storage-drivers"
+
+const MemoryStorage = StorageLive.pipe(
+  Layer.provide(MemoryDiskLive())
+)
+
+// Great for tests - no filesystem needed!
+```
+
+## Multi-Disk Setup
+
+Use `StorageManager` to work with multiple disks simultaneously:
+
+```typescript
+import { Effect } from "effect"
+import {
+  StorageManagerBuilder,
+  StorageManagerTag
+} from "@gello/storage"
+import {
+  makeLocalDisk,
+  makeS3Disk,
+  makeMemoryDisk
+} from "@gello/storage-drivers"
+
+const program = Effect.gen(function* () {
+  // Create disk instances
+  const localDisk = yield* makeLocalDisk({ root: "./storage" })
+  const s3Disk = yield* makeS3Disk({
+    bucket: "my-bucket",
+    region: "us-east-1"
+  })
+  const memoryDisk = yield* makeMemoryDisk()
+
+  // Build the storage manager
+  const StorageManagerLive = new StorageManagerBuilder()
+    .default("local")
+    .disk("local", localDisk)
+    .disk("s3", s3Disk)
+    .disk("uploads", memoryDisk)
+    .toLayer()
+
+  // Use the manager
+  return Effect.gen(function* () {
+    const manager = yield* StorageManagerTag
+
+    // Use default disk (local)
+    const storage = manager.storage()
+    yield* storage.put("file.txt", "Hello")
+
+    // Use specific disk
+    const s3Storage = manager.disk("s3")
+    yield* s3Storage.put("backup.txt", "Backup data")
+
+    // Get disk for uploads
+    const uploadDisk = manager.disk("uploads")
+    yield* uploadDisk.put("temp-upload.txt", "Temporary")
+  }).pipe(Effect.provide(StorageManagerLive))
+})
+```
+
+## Configuration
+
+Configure storage via environment variables for easy deployment:
+
+```bash
+# .env
+FILESYSTEM_DISK=s3
+
+# Local disk
+FILESYSTEM_LOCAL_ROOT=./storage
+
+# S3 disk
+AWS_BUCKET=my-bucket
+AWS_DEFAULT_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your-key
+AWS_SECRET_ACCESS_KEY=your-secret
+
+# Azure disk
+AZURE_STORAGE_ACCOUNT=myaccount
+AZURE_STORAGE_KEY=your-key
+AZURE_STORAGE_CONTAINER=my-container
+
+# GCS disk
+GCS_PROJECT_ID=my-project
+GCS_BUCKET=my-bucket
+GCS_KEY_FILE=/path/to/key.json
+```
+
+```typescript
+import {
+  readStorageConfigFromEnv,
+  makeStorageLayerFromConfig,
+  registerDiskFactory
+} from "@gello/storage"
+import {
+  makeLocalDisk,
+  makeS3Disk,
+  makeMemoryDisk
+} from "@gello/storage-drivers"
+
+// Register factories for each driver
+registerDiskFactory("local", (c) =>
+  makeLocalDisk({ root: c.root })
+)
+registerDiskFactory("s3", (c) =>
+  makeS3Disk({ bucket: c.bucket, region: c.region })
+)
+registerDiskFactory("memory", () => makeMemoryDisk())
+
+// Create layer from environment
+const StorageLive = Effect.gen(function* () {
+  const config = readStorageConfigFromEnv()
+  return yield* makeStorageLayerFromConfig(config)
+})
+```
+
+## File Operations
+
+```typescript
+const program = Effect.gen(function* () {
+  const storage = yield* Storage
+
+  // Write files
+  yield* storage.put("document.txt", "Hello, World!")
+  yield* storage.put("data.json", JSON.stringify({ foo: "bar" }))
+
+  // Read files
+  const text = yield* storage.getString("document.txt")
+  const bytes = yield* storage.get("image.png") // Uint8Array
+
+  // File info
+  const size = yield* storage.size("document.txt")
+  const modified = yield* storage.lastModified("document.txt")
+  const meta = yield* storage.getMetadata("document.txt")
+  // { path, size, mimeType, lastModified, visibility, isDirectory, metadata }
+
+  // Check existence
+  const exists = yield* storage.exists("document.txt")
+  const missing = yield* storage.missing("document.txt")
+
+  // Copy and move
+  yield* storage.copy("document.txt", "backup/document.txt")
+  yield* storage.move("old.txt", "new.txt")
+
+  // Delete
+  yield* storage.delete("document.txt")
+  yield* storage.deleteMany(["file1.txt", "file2.txt"])
+
+  // List files
+  const files = yield* storage.files("uploads")
+  const allFiles = yield* storage.allFiles("uploads") // recursive
+
+  // List directories
+  const dirs = yield* storage.directories("uploads")
+  const allDirs = yield* storage.allDirectories("uploads") // recursive
+
+  // Create/delete directories
+  yield* storage.makeDirectory("uploads/images")
+  yield* storage.deleteDirectory("temp")
+
+  // Append/prepend
+  yield* storage.append("log.txt", "New log entry\n")
+  yield* storage.prepend("log.txt", "Header\n")
+
+  // URLs
+  const url = yield* storage.url("document.txt")
+
+  // Visibility
+  yield* storage.setVisibility("document.txt", "public")
+  const visibility = yield* storage.getVisibility("document.txt")
+})
+```
+
+## Streaming
+
+For large files, use streaming to avoid loading entire files into memory:
+
+```typescript
+import { Stream } from "effect"
+import { StreamableDiskTag } from "@gello/storage"
+import { LocalDiskStreamableLive } from "@gello/storage-drivers"
+
+const program = Effect.gen(function* () {
+  const disk = yield* StreamableDiskTag
+
+  // Read as stream
+  const readStream = yield* disk.readStream("large-file.zip")
+
+  // Process chunks
+  yield* Stream.runForEach(readStream, (chunk) =>
+    Effect.log(`Got ${chunk.length} bytes`)
+  )
+
+  // Write from stream
+  const dataStream = Stream.fromIterable([
+    new TextEncoder().encode("Part 1"),
+    new TextEncoder().encode("Part 2"),
+    new TextEncoder().encode("Part 3"),
+  ])
+
+  yield* disk.writeStream("output.txt", dataStream)
+})
+```
+
+## Temporary URLs
+
+Generate signed URLs for temporary access to private files:
+
+```typescript
+import { Duration } from "effect"
+import { TemporaryUrlDiskTag } from "@gello/storage"
+import { S3DiskTemporaryUrlLive } from "@gello/storage-drivers"
+
+const program = Effect.gen(function* () {
+  const disk = yield* TemporaryUrlDiskTag
+
+  // Generate a download URL (expires in 1 hour by default)
+  const downloadUrl = yield* disk.temporaryUrl("private/document.pdf")
+
+  // Custom expiration
+  const shortUrl = yield* disk.temporaryUrl(
+    "private/document.pdf",
+    Duration.minutes(15)
+  )
+
+  // Generate an upload URL for direct browser uploads
+  const uploadUrl = yield* disk.temporaryUploadUrl(
+    "uploads/user-avatar.png",
+    Duration.hours(1)
+  )
+
+  // Use in HTTP response
+  return { downloadUrl, uploadUrl }
+})
+```
+
+## HTTP Helpers
+
+Serve files via HTTP responses:
+
+```typescript
+import { download, stream, redirect } from "@gello/storage"
+import { Duration } from "effect"
+
+// Download file (Content-Disposition: attachment)
+const downloadResponse = yield* download(storage, "reports/annual.pdf", {
+  filename: "Annual-Report-2024.pdf"
+})
+// Returns { body, status: 200, headers }
+
+// Stream file inline (view in browser)
+const viewResponse = yield* stream(storage, "images/photo.jpg")
+
+// Redirect to signed URL
+const redirectResponse = yield* redirect(
+  storage,
+  "private/file.pdf",
+  Duration.minutes(5)
+)
+// Returns { status: 302, headers: { Location: signedUrl } }
+```
+
+## Testing
+
+Use `MockDisk` for testing without real file systems:
+
+```typescript
+import { Effect } from "effect"
+import { makeMockDisk, MockStorageLive } from "@gello/storage"
+
+describe("FileService", () => {
+  it("should upload files", async () => {
+    const result = await Effect.runPromise(
+      Effect.gen(function* () {
+        const mock = yield* makeMockDisk()
+
+        // Pre-populate files
+        mock.setFile("existing.txt", "Existing content")
+
+        const storage = mock.disk
+        yield* storage.put("new.txt", "New content")
+
+        // Inspect stored files
+        const files = mock.getFiles()
+        expect(files.has("new.txt")).toBe(true)
+
+        // Verify content
+        const file = mock.getFile("new.txt")
+        expect(file?.contents).toEqual(
+          new TextEncoder().encode("New content")
+        )
+
+        return true
+      })
+    )
+
+    expect(result).toBe(true)
+  })
+
+  it("can simulate errors", async () => {
+    const result = await Effect.runPromise(
+      Effect.gen(function* () {
+        const mock = yield* makeMockDisk({
+          simulateErrors: {
+            get: "FileNotFound"
+          }
+        })
+
+        const storage = mock.disk
+        const error = yield* Effect.flip(storage.get("any.txt"))
+
+        return error._tag
+      })
+    )
+
+    expect(result).toBe("FileNotFoundError")
+  })
+})
+```
+
+<Callout type="info" title="CLI Support">
+Use the Gello CLI to check your storage configuration:
+
+```bash
+gello storage        # Show configured disks
+gello storage:config # Generate storage config module
+```
+</Callout>

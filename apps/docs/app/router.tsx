@@ -5,6 +5,8 @@ export function getRouter() {
   const router = createRouter({
     routeTree,
     scrollRestoration: true,
+    // Enable View Transitions API for smooth page transitions
+    defaultViewTransition: true,
   });
 
   return router;

@@ -34,14 +34,8 @@ jobs:
         run: pnpm nx build docs --skip-nx-cache
         working-directory: .
 
-      - name: Debug - List build output
-        run: |
-          echo "=== Listing apps/docs/ ==="
-          ls -la apps/docs/
-          echo "=== Listing apps/docs/dist/ ==="
-          ls -la apps/docs/dist/ || echo "No dist folder"
-          echo "=== Listing apps/docs/dist/server/ ==="
-          ls -la apps/docs/dist/server/ || echo "No dist/server folder"
+      - name: Clean wrangler cache
+        run: rm -rf apps/docs/.wrangler
 
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3

@@ -1735,23 +1735,29 @@ export const passwordResetEmail = (data: {
     .with(data);
 ```
 
-### 6.4 React Email Templates
+### 6.4 JSX Templates (Using @gello/mail-templates)
+
+Auth templates are built on the existing `@gello/mail-templates` component library, ensuring consistent styling across all emails and leveraging the theme system.
+
+**Available Components from `@gello/mail-templates`:**
+- **Layout**: `BaseLayout`, `Section`, `Card`, `Divider`, `Spacer`
+- **Typography**: `Heading`, `Text`, `Link`, `Code`
+- **Actions**: `Button`
+- **Data**: `Badge`, `Alert`
+- **Theming**: `ThemeProvider`, `defineMailTheme`
 
 ```tsx
-// libs/auth/templates/email/react/VerificationEmail.tsx
+// libs/auth/templates/VerificationEmail.tsx
 
 import {
-  Body,
-  Button,
-  Container,
-  Head,
-  Heading,
-  Html,
-  Link,
-  Preview,
+  BaseLayout,
   Section,
+  Heading,
   Text,
-} from "@react-email/components";
+  Button,
+  Link,
+  Spacer,
+} from "@gello/mail-templates";
 
 interface VerificationEmailProps {
   userName: string;
@@ -1759,107 +1765,190 @@ interface VerificationEmailProps {
   appName: string;
 }
 
-export const VerificationEmailTemplate = ({
+export const VerificationEmail = ({
   userName,
   verificationUrl,
   appName,
 }: VerificationEmailProps) => (
-  <Html>
-    <Head />
-    <Preview>Verify your email address for {appName}</Preview>
-    <Body style={main}>
-      <Container style={container}>
-        <Heading style={h1}>Verify your email</Heading>
+  <BaseLayout preview={`Verify your email address for ${appName}`}>
+    <Section>
+      <Heading level={1}>Verify your email</Heading>
 
-        <Text style={text}>Hi {userName},</Text>
+      <Text>Hi {userName},</Text>
 
-        <Text style={text}>
-          Thanks for signing up for {appName}! Please click the button below to
-          verify your email address.
-        </Text>
+      <Text>
+        Thanks for signing up for {appName}! Please click the button below to
+        verify your email address.
+      </Text>
 
-        <Section style={buttonContainer}>
-          <Button style={button} href={verificationUrl}>
-            Verify Email Address
-          </Button>
-        </Section>
+      <Spacer size="lg" />
 
-        <Text style={text}>
-          If you didn't create an account, you can safely ignore this email.
-        </Text>
+      <Button href={verificationUrl} variant="primary" fullWidth>
+        Verify Email Address
+      </Button>
 
-        <Text style={footer}>
-          If the button doesn't work, copy and paste this link into your browser:
-          <br />
-          <Link href={verificationUrl} style={link}>
-            {verificationUrl}
-          </Link>
-        </Text>
-      </Container>
-    </Body>
-  </Html>
+      <Spacer size="lg" />
+
+      <Text muted>
+        If you didn't create an account, you can safely ignore this email.
+      </Text>
+
+      <Text size="sm" muted>
+        If the button doesn't work, copy and paste this link:
+        <br />
+        <Link href={verificationUrl}>{verificationUrl}</Link>
+      </Text>
+    </Section>
+  </BaseLayout>
 );
 
-const main = {
-  backgroundColor: "#f6f9fc",
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-};
-
-const container = {
-  backgroundColor: "#ffffff",
-  margin: "0 auto",
-  padding: "40px",
-  borderRadius: "8px",
-  maxWidth: "600px",
-};
-
-const h1 = {
-  color: "#1a1a1a",
-  fontSize: "24px",
-  fontWeight: "600",
-  lineHeight: "1.25",
-  marginBottom: "24px",
-};
-
-const text = {
-  color: "#4a4a4a",
-  fontSize: "16px",
-  lineHeight: "1.5",
-  marginBottom: "16px",
-};
-
-const buttonContainer = {
-  textAlign: "center" as const,
-  marginTop: "32px",
-  marginBottom: "32px",
-};
-
-const button = {
-  backgroundColor: "#5046e5",
-  borderRadius: "6px",
-  color: "#ffffff",
-  fontSize: "16px",
-  fontWeight: "600",
-  padding: "12px 24px",
-  textDecoration: "none",
-};
-
-const footer = {
-  color: "#8898aa",
-  fontSize: "14px",
-  lineHeight: "1.5",
-  marginTop: "32px",
-};
-
-const link = {
-  color: "#5046e5",
-  textDecoration: "underline",
-};
-
-export default VerificationEmailTemplate;
+export default VerificationEmail;
 ```
 
-### 6.5 Password Flow Service
+```tsx
+// libs/auth/templates/PasswordResetEmail.tsx
+
+import {
+  BaseLayout,
+  Section,
+  Heading,
+  Text,
+  Button,
+  Link,
+  Spacer,
+  Alert,
+} from "@gello/mail-templates";
+
+interface PasswordResetEmailProps {
+  userName: string;
+  resetUrl: string;
+  expiresIn: string;
+  appName: string;
+}
+
+export const PasswordResetEmail = ({
+  userName,
+  resetUrl,
+  expiresIn,
+  appName,
+}: PasswordResetEmailProps) => (
+  <BaseLayout preview={`Reset your password for ${appName}`}>
+    <Section>
+      <Heading level={1}>Reset your password</Heading>
+
+      <Text>Hi {userName},</Text>
+
+      <Text>
+        We received a request to reset your password. Click the button below
+        to choose a new password.
+      </Text>
+
+      <Alert variant="warning">
+        This link expires in {expiresIn}. If you didn't request this, ignore this email.
+      </Alert>
+
+      <Spacer size="lg" />
+
+      <Button href={resetUrl} variant="primary" fullWidth>
+        Reset Password
+      </Button>
+
+      <Spacer size="lg" />
+
+      <Text size="sm" muted>
+        Or copy this link: <Link href={resetUrl}>{resetUrl}</Link>
+      </Text>
+    </Section>
+  </BaseLayout>
+);
+
+export default PasswordResetEmail;
+```
+
+```tsx
+// libs/auth/templates/WelcomeEmail.tsx
+
+import {
+  BaseLayout,
+  Section,
+  Card,
+  Heading,
+  Text,
+  Button,
+  Spacer,
+} from "@gello/mail-templates";
+
+interface WelcomeEmailProps {
+  userName: string;
+  appName: string;
+  dashboardUrl: string;
+}
+
+export const WelcomeEmail = ({
+  userName,
+  appName,
+  dashboardUrl,
+}: WelcomeEmailProps) => (
+  <BaseLayout preview={`Welcome to ${appName}!`}>
+    <Section>
+      <Heading level={1}>Welcome to {appName}!</Heading>
+
+      <Text>Hi {userName},</Text>
+
+      <Text>
+        Your account has been created and you're all set to get started.
+      </Text>
+
+      <Spacer size="md" />
+
+      <Card>
+        <Heading level={3}>What's next?</Heading>
+        <Text>Explore the dashboard to see what you can do.</Text>
+      </Card>
+
+      <Spacer size="lg" />
+
+      <Button href={dashboardUrl} variant="primary">
+        Go to Dashboard
+      </Button>
+    </Section>
+  </BaseLayout>
+);
+
+export default WelcomeEmail;
+```
+
+### 6.5 Registering Auth Templates
+
+```typescript
+// libs/auth/templates/index.ts
+
+import { registerTemplates } from "@gello/mail-templates";
+import { VerificationEmail } from "./VerificationEmail";
+import { PasswordResetEmail } from "./PasswordResetEmail";
+import { WelcomeEmail } from "./WelcomeEmail";
+import { PasswordChangedEmail } from "./PasswordChangedEmail";
+import { NewLoginEmail } from "./NewLoginEmail";
+
+// Register all auth templates
+export const registerAuthTemplates = () =>
+  registerTemplates({
+    "auth/verification": VerificationEmail,
+    "auth/password-reset": PasswordResetEmail,
+    "auth/welcome": WelcomeEmail,
+    "auth/password-changed": PasswordChangedEmail,
+    "auth/new-login": NewLoginEmail,
+  });
+
+// Export templates for direct use
+export {
+  VerificationEmail,
+  PasswordResetEmail,
+  WelcomeEmail,
+};
+```
+
+### 6.6 Password Flow Service
 
 ```typescript
 // libs/auth/core/domain/password-reset.ts
@@ -1962,7 +2051,7 @@ const makePasswordReset = Effect.gen(function* () {
 export const PasswordResetLive = Layer.effect(PasswordReset, makePasswordReset);
 ```
 
-### 6.6 Email Verification Service
+### 6.7 Email Verification Service
 
 ```typescript
 // libs/auth/core/domain/email-verification.ts

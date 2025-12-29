@@ -1,0 +1,21 @@
+{
+  "name": "@gello/mail-templates",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    }
+  },
+  "peerDependencies": {
+    "effect": "^3.0.0",
+    "react": ">=18.0.0",
+    "@react-email/components": ">=0.0.20",
+    "@react-email/render": ">=0.0.16",
+    "@gello/mail-core": "*"
+  }
+}

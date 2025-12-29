@@ -1,0 +1,21 @@
+{
+  "name": "mail-drivers",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/mail/drivers/src",
+  "projectType": "library",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "@nx/esbuild:esbuild",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/mail/drivers",
+        "main": "libs/mail/drivers/src/index.ts",
+        "tsConfig": "libs/mail/drivers/tsconfig.lib.json",
+        "assets": [],
+        "format": ["cjs"],
+        "generatePackageJson": true
+      }
+    }
+  }
+}

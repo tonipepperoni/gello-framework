@@ -1,0 +1,21 @@
+{
+  "name": "mail-core",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/mail/core/src",
+  "projectType": "library",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "@nx/esbuild:esbuild",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/mail/core",
+        "main": "libs/mail/core/src/index.ts",
+        "tsConfig": "libs/mail/core/tsconfig.lib.json",
+        "assets": [],
+        "format": ["cjs"],
+        "generatePackageJson": true
+      }
+    }
+  }
+}

@@ -1,9 +1,9 @@
 {
-  "name": "worker",
+  "name": "queue-worker",
   "$schema": "../../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "libs/queue/worker/src",
   "projectType": "library",
   "tags": [],
-  "// targets": "to see all targets run: nx show project worker --web",
+  "// targets": "to see all targets run: nx show project queue-worker --web",
   "targets": {}
 }

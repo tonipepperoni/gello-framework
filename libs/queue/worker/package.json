@@ -1,9 +1,18 @@
 {
   "name": "@gello/queue-worker",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "./index.js",
-  "types": "./index.d.ts",
-  "dependencies": {}
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    }
+  },
+  "peerDependencies": {
+    "effect": "^3.0.0",
+    "@gello/queue-core": "workspace:*"
+  }
 }

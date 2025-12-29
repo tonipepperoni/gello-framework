@@ -1,0 +1,61 @@
+{
+  "name": "queue-orchestrator",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/queue-orchestrator/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "@nx/esbuild:esbuild",
+      "outputs": ["{options.outputPath}"],
+      "defaultConfiguration": "production",
+      "options": {
+        "platform": "node",
+        "outputPath": "dist/apps/queue-orchestrator",
+        "format": ["esm"],
+        "bundle": true,
+        "main": "apps/queue-orchestrator/src/main.ts",
+        "tsConfig": "apps/queue-orchestrator/tsconfig.app.json",
+        "assets": ["apps/queue-orchestrator/src/assets"],
+        "generatePackageJson": true,
+        "skipTypeCheck": true,
+        "declaration": false,
+        "external": ["effect", "@effect/*"],
+        "esbuildOptions": {
+          "sourcemap": true,
+          "outExtension": {
+            ".js": ".mjs"
+          }
+        }
+      },
+      "configurations": {
+        "development": {},
+        "production": {
+          "esbuildOptions": {
+            "sourcemap": false,
+            "outExtension": {
+              ".js": ".mjs"
+            }
+          }
+        }
+      }
+    },
+    "serve": {
+      "executor": "@nx/js:node",
+      "defaultConfiguration": "development",
+      "dependsOn": ["build"],
+      "options": {
+        "buildTarget": "queue-orchestrator:build",
+        "runBuildTargetDependencies": false
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "queue-orchestrator:build:development"
+        },
+        "production": {
+          "buildTarget": "queue-orchestrator:build:production"
+        }
+      }
+    }
+  },
+  "tags": []
+}

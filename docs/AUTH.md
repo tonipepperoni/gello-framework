@@ -2153,40 +2153,65 @@ yield* EmailVerification.resend(userId);
 ### 8.5 Configuration
 
 ```typescript
-// Secure defaults
-export const secureAuthConfig: AuthConfig = {
+// config/auth.ts - Auth configuration using Gello's dot notation config
+
+import { Config, env } from "@gello/core-config";
+
+export const authConfig = {
   jwt: {
-    secret: process.env.JWT_SECRET!, // Must be set
-    algorithm: "HS256",
-    accessTokenTtl: Duration.minutes(15),
-    refreshTokenTtl: Duration.days(7),
+    secret: env("JWT_SECRET"), // Required - will fail if not set
+    algorithm: env("JWT_ALGORITHM", "HS256"),
+    accessTokenTtl: env("JWT_ACCESS_TTL", "15m"),   // 15 minutes
+    refreshTokenTtl: env("JWT_REFRESH_TTL", "7d"),  // 7 days
+    issuer: env("JWT_ISSUER", ""),
+    audience: env("JWT_AUDIENCE", ""),
   },
   session: {
-    cookieName: "__session",
+    driver: env("SESSION_DRIVER", "memory"), // memory | redis | database
+    cookieName: env("SESSION_COOKIE", "__session"),
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: Duration.days(7),
+    secure: env("APP_ENV") === "production",
+    sameSite: env("SESSION_SAME_SITE", "lax") as "strict" | "lax" | "none",
+    maxAge: env("SESSION_LIFETIME", "7d"),
   },
   password: {
-    minLength: 8,
-    requireUppercase: true,
-    requireLowercase: true,
-    requireNumbers: true,
-    requireSymbols: false,
-    bcryptRounds: 12,
+    minLength: Number(env("PASSWORD_MIN_LENGTH", "8")),
+    maxLength: Number(env("PASSWORD_MAX_LENGTH", "128")),
+    requireUppercase: env("PASSWORD_REQUIRE_UPPERCASE", "true") === "true",
+    requireLowercase: env("PASSWORD_REQUIRE_LOWERCASE", "true") === "true",
+    requireNumbers: env("PASSWORD_REQUIRE_NUMBERS", "true") === "true",
+    requireSymbols: env("PASSWORD_REQUIRE_SYMBOLS", "false") === "true",
+    bcryptRounds: Number(env("PASSWORD_BCRYPT_ROUNDS", "12")),
   },
   rateLimit: {
-    login: { maxAttempts: 5, windowMs: Duration.minutes(15) },
-    passwordReset: { maxAttempts: 3, windowMs: Duration.hours(1) },
-    verification: { maxAttempts: 3, windowMs: Duration.hours(1) },
+    login: {
+      maxAttempts: Number(env("RATE_LIMIT_LOGIN_ATTEMPTS", "5")),
+      windowMs: env("RATE_LIMIT_LOGIN_WINDOW", "15m"),
+    },
+    passwordReset: {
+      maxAttempts: Number(env("RATE_LIMIT_RESET_ATTEMPTS", "3")),
+      windowMs: env("RATE_LIMIT_RESET_WINDOW", "1h"),
+    },
+    verification: {
+      maxAttempts: Number(env("RATE_LIMIT_VERIFY_ATTEMPTS", "3")),
+      windowMs: env("RATE_LIMIT_VERIFY_WINDOW", "1h"),
+    },
   },
   lockout: {
-    enabled: true,
-    maxAttempts: 10,
-    duration: Duration.hours(1),
+    enabled: env("LOCKOUT_ENABLED", "true") === "true",
+    maxAttempts: Number(env("LOCKOUT_MAX_ATTEMPTS", "10")),
+    duration: env("LOCKOUT_DURATION", "1h"),
+  },
+  oauth: {
+    stateDriver: env("OAUTH_STATE_DRIVER", "memory"), // memory | redis
+    stateTtl: env("OAUTH_STATE_TTL", "10m"),
   },
 };
+
+// Usage in services via Config service (dot notation)
+const jwtSecret = yield* Config.string("auth.jwt.secret");
+const bcryptRounds = yield* Config.number("auth.password.bcryptRounds", 12);
+const lockoutEnabled = yield* Config.boolean("auth.lockout.enabled", true);
 ```
 
 ---
@@ -2319,61 +2344,142 @@ export const AppUserRepositoryLive = Layer.succeed(
 
 ## Appendix A: Configuration Reference
 
+### Environment Variables
+
+```bash
+# .env - Auth configuration
+
+# JWT
+JWT_SECRET=your-secret-key-min-32-chars      # Required
+JWT_ALGORITHM=HS256                           # HS256 | HS384 | HS512 | RS256 | RS384 | RS512
+JWT_ACCESS_TTL=15m                            # Access token lifetime
+JWT_REFRESH_TTL=7d                            # Refresh token lifetime
+JWT_ISSUER=                                   # Optional JWT issuer
+JWT_AUDIENCE=                                 # Optional JWT audience
+
+# Session
+SESSION_DRIVER=memory                         # memory | redis | database
+SESSION_COOKIE=__session                      # Cookie name
+SESSION_SAME_SITE=lax                         # strict | lax | none
+SESSION_LIFETIME=7d                           # Session lifetime
+
+# Password
+PASSWORD_MIN_LENGTH=8
+PASSWORD_MAX_LENGTH=128
+PASSWORD_REQUIRE_UPPERCASE=true
+PASSWORD_REQUIRE_LOWERCASE=true
+PASSWORD_REQUIRE_NUMBERS=true
+PASSWORD_REQUIRE_SYMBOLS=false
+PASSWORD_BCRYPT_ROUNDS=12
+
+# Rate Limiting
+RATE_LIMIT_LOGIN_ATTEMPTS=5
+RATE_LIMIT_LOGIN_WINDOW=15m
+RATE_LIMIT_RESET_ATTEMPTS=3
+RATE_LIMIT_RESET_WINDOW=1h
+RATE_LIMIT_VERIFY_ATTEMPTS=3
+RATE_LIMIT_VERIFY_WINDOW=1h
+
+# Account Lockout
+LOCKOUT_ENABLED=true
+LOCKOUT_MAX_ATTEMPTS=10
+LOCKOUT_DURATION=1h
+
+# OAuth
+OAUTH_STATE_DRIVER=memory                     # memory | redis
+OAUTH_STATE_TTL=10m
+
+# OAuth Providers
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+GITHUB_REDIRECT_URI=http://localhost:3000/auth/github/callback
+
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=http://localhost:3000/auth/google/callback
+```
+
+### Config Layer Setup
+
 ```typescript
-interface AuthConfig {
-  jwt: {
-    secret: string;
-    algorithm: "HS256" | "HS384" | "HS512" | "RS256" | "RS384" | "RS512";
-    accessTokenTtl: Duration.Duration;
-    refreshTokenTtl: Duration.Duration;
-    issuer?: string;
-    audience?: string;
-  };
-  session: {
-    driver: "memory" | "redis" | "database";
-    cookieName: string;
-    httpOnly: boolean;
-    secure: boolean;
-    sameSite: "strict" | "lax" | "none";
-    maxAge: Duration.Duration;
-  };
-  password: {
-    minLength: number;
-    maxLength: number;
-    requireUppercase: boolean;
-    requireLowercase: boolean;
-    requireNumbers: boolean;
-    requireSymbols: boolean;
-    bcryptRounds: number;
-  };
+// config/index.ts
+import { Config } from "@gello/core-config";
+import { authConfig } from "./auth";
+import { appConfig } from "./app";
+
+export const AppConfigLayer = Config.layer({
+  app: appConfig,
+  auth: authConfig,
+});
+
+// main.ts - Provide config to application
+const AppLayers = Layer.mergeAll(
+  AppConfigLayer,
+  AuthServiceLive,
+  SessionStoreLive,
+  // ...
+);
+
+runApp(app, AppLayers);
+```
+
+### Accessing Config in Services
+
+```typescript
+// In any Effect-based service
+const makeTokenService = Effect.gen(function* () {
+  const config = yield* Config;
+
+  // Dot notation access with type coercion
+  const secret = yield* config.string("auth.jwt.secret");
+  const algorithm = yield* config.string("auth.jwt.algorithm", "HS256");
+  const accessTtl = yield* config.string("auth.jwt.accessTokenTtl", "15m");
+  const bcryptRounds = yield* config.number("auth.password.bcryptRounds", 12);
+  const lockoutEnabled = yield* config.boolean("auth.lockout.enabled", true);
+
+  // Parse duration strings
+  const ttlDuration = Duration.decode(accessTtl);
+
+  return TokenService.of({
+    // ... implementation using config values
+  });
+});
+
+// Or use the helper functions directly
+import { Config } from "@gello/core-config";
+
+const handler = Effect.gen(function* () {
+  const maxAttempts = yield* Config.number("auth.rateLimit.login.maxAttempts", 5);
+  // ...
+});
+```
+
+### OAuth Provider Config
+
+```typescript
+// config/auth.ts
+export const authConfig = {
+  // ... other config
   oauth: {
     providers: {
-      [provider: string]: {
-        clientId: string;
-        clientSecret: string;
-        redirectUri: string;
-        scopes: string[];
-      };
-    };
-    stateStore: "memory" | "redis";
-    stateTtl: Duration.Duration;
-  };
-  rateLimit: {
-    login: RateLimitConfig;
-    passwordReset: RateLimitConfig;
-    verification: RateLimitConfig;
-  };
-  lockout: {
-    enabled: boolean;
-    maxAttempts: number;
-    duration: Duration.Duration;
-  };
-}
+      github: {
+        clientId: env("GITHUB_CLIENT_ID"),
+        clientSecret: env("GITHUB_CLIENT_SECRET"),
+        redirectUri: env("GITHUB_REDIRECT_URI"),
+        scopes: ["read:user", "user:email"],
+      },
+      google: {
+        clientId: env("GOOGLE_CLIENT_ID"),
+        clientSecret: env("GOOGLE_CLIENT_SECRET"),
+        redirectUri: env("GOOGLE_REDIRECT_URI"),
+        scopes: ["openid", "email", "profile"],
+      },
+    },
+  },
+};
 
-interface RateLimitConfig {
-  maxAttempts: number;
-  windowMs: Duration.Duration;
-}
+// Access in OAuth service
+const githubConfig = yield* Config.get<OAuthProviderConfig>("auth.oauth.providers.github");
 ```
 
 ---

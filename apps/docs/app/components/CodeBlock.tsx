@@ -1,30 +1,12 @@
 'use client';
 
-import { use, useRef, useState, type ReactNode } from 'react';
+import { use, useEffect, useState, type ReactNode } from 'react';
 import { ClientOnly } from '@tanstack/react-router';
-import { toJsxRuntime } from 'hast-util-to-jsx-runtime';
-import { Fragment, jsx, jsxs } from 'react/jsx-runtime';
 import { clsx } from 'clsx';
 
-// Simple cn utility
 function cn(...inputs: (string | undefined | null | false)[]): string {
   return clsx(inputs);
 }
-
-// Promise cache for highlighter
-const highlighterCache = new Map<string, Promise<unknown>>();
-
-function cachePromise<T>(key: string, create: () => Promise<T>): Promise<T> {
-  const cached = highlighterCache.get(key);
-  if (cached) return cached as Promise<T>;
-  const promise = create();
-  highlighterCache.set(key, promise);
-  return promise;
-}
-
-// Supported languages for our docs
-const SUPPORTED_LANGS = ['typescript', 'tsx', 'javascript', 'jsx', 'bash', 'json', 'text', 'sh', 'shell'] as const;
-type SupportedLang = typeof SUPPORTED_LANGS[number];
 
 // Language aliases
 const LANG_ALIASES: Record<string, string> = {
@@ -34,33 +16,48 @@ const LANG_ALIASES: Record<string, string> = {
   shell: 'bash',
 };
 
-async function getHighlighter() {
-  const { createHighlighter } = await import(/* @vite-ignore */ 'shiki');
-  const engine = await import(/* @vite-ignore */ 'shiki/engine/javascript').then(
-    (res) => res.createJavaScriptRegexEngine()
-  );
+const SUPPORTED_LANGS = ['typescript', 'tsx', 'javascript', 'jsx', 'bash', 'json', 'text'];
 
-  return createHighlighter({
-    themes: ['github-dark', 'github-light'],
-    langs: ['typescript', 'tsx', 'javascript', 'jsx', 'bash', 'json', 'text'],
-    engine,
+// Global cache for highlighted HTML - persists across navigations
+const htmlCache = new Map<string, string>();
+
+// Promise cache for async operations
+const promiseCache = new Map<string, Promise<any>>();
+
+function cachePromise<T>(key: string, create: () => Promise<T>): Promise<T> {
+  const cached = promiseCache.get(key);
+  if (cached) return cached as Promise<T>;
+  const promise = create();
+  promiseCache.set(key, promise);
+  return promise;
+}
+
+async function getHighlighter() {
+  return cachePromise('shiki-highlighter', async () => {
+    const { createHighlighter } = await import(/* @vite-ignore */ 'shiki');
+    const engine = await import(/* @vite-ignore */ 'shiki/engine/javascript').then(
+      (res) => res.createJavaScriptRegexEngine()
+    );
+
+    return createHighlighter({
+      themes: ['github-dark', 'github-light'],
+      langs: ['typescript', 'tsx', 'javascript', 'jsx', 'bash', 'json', 'text'],
+      engine,
+    });
   });
 }
 
-// Highlight cache
-const highlightCache = new Map<string, Promise<ReactNode>>();
+function highlightToHtml(code: string, lang: string): Promise<string> {
+  const resolvedLang = LANG_ALIASES[lang] ?? lang;
+  const finalLang = SUPPORTED_LANGS.includes(resolvedLang) ? resolvedLang : 'text';
+  const cacheKey = `${finalLang}:${code}`;
 
-async function highlightCode(code: string, lang: string): Promise<ReactNode> {
-  const cacheKey = `${lang}:${code}`;
-  const cached = highlightCache.get(cacheKey);
-  if (cached) return cached;
+  const cached = htmlCache.get(cacheKey);
+  if (cached) return Promise.resolve(cached);
 
-  const promise = (async () => {
-    const highlighter = await cachePromise('shiki', getHighlighter);
-    const resolvedLang = LANG_ALIASES[lang] ?? lang;
-    const finalLang = SUPPORTED_LANGS.includes(resolvedLang as SupportedLang) ? resolvedLang : 'text';
-
-    const hast = (highlighter as any).codeToHast(code, {
+  return cachePromise(cacheKey, async () => {
+    const highlighter = await getHighlighter();
+    const html = highlighter.codeToHtml(code, {
       lang: finalLang,
       themes: {
         light: 'github-light',
@@ -69,16 +66,9 @@ async function highlightCode(code: string, lang: string): Promise<ReactNode> {
       defaultColor: false,
     });
 
-    return toJsxRuntime(hast, {
-      jsx,
-      jsxs,
-      development: false,
-      Fragment,
-    });
-  })();
-
-  highlightCache.set(cacheKey, promise);
-  return promise;
+    htmlCache.set(cacheKey, html);
+    return html;
+  });
 }
 
 // Copy button component
@@ -115,25 +105,41 @@ function CopyButton({ code }: { code: string }) {
   );
 }
 
-// Pre component matching fumadocs
-function Pre({ children, className, ...props }: React.HTMLAttributes<HTMLPreElement>) {
-  return (
-    <pre {...props} className={cn('min-w-full w-max *:flex *:flex-col', className)}>
-      {children}
-    </pre>
-  );
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// Generate plain code HTML with same structure as shiki output
+function getPlainCodeHtml(code: string): string {
+  return `<pre class="shiki" style="background-color:var(--shiki-dark-bg);color:var(--shiki-dark)"><code>${code
+    .split('\n')
+    .map((line) => `<span class="line"><span>${escapeHtml(line) || ' '}</span></span>`)
+    .join('\n')}</code></pre>`;
 }
 
 interface CodeBlockContentProps {
   code: string;
-  lang?: string;
-  title?: string;
+  lang: string;
 }
 
-function CodeBlockContent({ code, lang = 'text', title }: CodeBlockContentProps) {
-  const highlighted = use(highlightCode(code, lang));
-  const areaRef = useRef<HTMLDivElement>(null);
+function CodeBlockContent({ code, lang }: CodeBlockContentProps) {
+  // Use React's use() hook to suspend until highlighting is done
+  const html = use(highlightToHtml(code, lang));
+  return <div dangerouslySetInnerHTML={{ __html: html }} />;
+}
 
+interface CodeBlockWrapperProps {
+  code: string;
+  title?: string;
+  children: ReactNode;
+}
+
+function CodeBlockWrapper({ code, title, children }: CodeBlockWrapperProps) {
   return (
     <figure
       dir="ltr"
@@ -156,40 +162,16 @@ function CodeBlockContent({ code, lang = 'text', title }: CodeBlockContentProps)
         </div>
       )}
       <div
-        ref={areaRef}
         role="region"
         tabIndex={0}
         className={cn(
           'text-[0.8125rem] py-3.5 overflow-auto max-h-[600px]',
           'fd-scroll-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-fd-ring',
+          '[&_pre]:min-w-full [&_pre]:w-max [&_code]:flex [&_code]:flex-col [&_.line]:px-4',
           !title && 'pr-8'
         )}
       >
-        {highlighted}
-      </div>
-    </figure>
-  );
-}
-
-function CodeBlockFallback({ code, title }: { code: string; title?: string }) {
-  return (
-    <figure
-      dir="ltr"
-      tabIndex={-1}
-      className={cn(
-        'my-4 bg-fd-card rounded-xl',
-        'relative border shadow-sm not-prose overflow-hidden text-sm'
-      )}
-    >
-      {title && (
-        <div className="flex text-fd-muted-foreground items-center gap-2 h-9.5 border-b px-4">
-          <figcaption className="flex-1 truncate">{title}</figcaption>
-        </div>
-      )}
-      <div className="text-[0.8125rem] py-3.5 px-4 overflow-auto max-h-[600px]">
-        <pre className="min-w-full w-max">
-          <code className="text-fd-foreground">{code}</code>
-        </pre>
+        {children}
       </div>
     </figure>
   );
@@ -202,10 +184,22 @@ export interface CodeBlockProps {
   children?: ReactNode;
 }
 
-export function CodeBlock({ code, lang, title }: CodeBlockProps) {
+export function CodeBlock({ code, lang = 'text', title }: CodeBlockProps) {
+  // Check if we have cached HTML - if so, use it for the fallback too
+  const resolvedLang = LANG_ALIASES[lang] ?? lang;
+  const finalLang = SUPPORTED_LANGS.includes(resolvedLang) ? resolvedLang : 'text';
+  const cacheKey = `${finalLang}:${code}`;
+  const cachedHtml = htmlCache.get(cacheKey);
+
+  const fallbackHtml = cachedHtml ?? getPlainCodeHtml(code);
+
   return (
-    <ClientOnly fallback={<CodeBlockFallback code={code} title={title} />}>
-      <CodeBlockContent code={code} lang={lang} title={title} />
-    </ClientOnly>
+    <CodeBlockWrapper code={code} title={title}>
+      <ClientOnly
+        fallback={<div dangerouslySetInnerHTML={{ __html: fallbackHtml }} />}
+      >
+        <CodeBlockContent code={code} lang={lang} />
+      </ClientOnly>
+    </CodeBlockWrapper>
   );
 }

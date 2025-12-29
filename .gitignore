@@ -6,6 +6,9 @@ node_modules
 dist
 *.tsbuildinfo
 out-tsc
+.output
+.nitro
+.wrangler
 
 # Vite
 .vite

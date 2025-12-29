@@ -1,225 +1,617 @@
 ---
 title: Queues
-description: Laravel-inspired job queues — implemented with pure Effect primitives
+description: Laravel 4.2-inspired queue system with hexagonal DDD architecture built on Effect
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
+import { Steps, Step } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Mermaid } from '../../app/components';
 
-## The Pattern
+Gello's queue system provides a unified API for deferring time-consuming tasks like sending emails, processing uploads, or generating reports. Inspired by Laravel 4.2's elegant queue API, it leverages Effect's functional paradigm for type-safe, composable job processing.
 
-Gello's queue system takes inspiration from Laravel's elegant job dispatching API,
-but implements it using Effect's functional patterns. Jobs are values, workers are Layers,
-and everything is type-safe.
-
-<Callout type="info" title="Pure Effect">
-Queues use `Context.Tag` for the service and `Layer.scoped` for
-lifecycle management — no external queue dependency required.
+<Callout type="info" title="Effect-Native">
+Queues use `Context.Tag` for services, `Layer.scoped` for lifecycle management,
+and Effect primitives like `Queue`, `Fiber`, and `Ref` — no external dependencies required.
 </Callout>
 
-## Queue Service Layer
+## Architecture
+
+The queue system follows hexagonal architecture with clear separation between domain, ports, and adapters.
+
+<Mermaid chart={`
+flowchart TB
+    subgraph Application["Application Layer"]
+        dispatch["Queue.push(job)"]
+        define["Job Definitions"]
+        middleware["Job Middleware"]
+    end
+
+    subgraph Domain["Domain Layer"]
+        job["Job"]
+        jobid["JobId"]
+        queuename["QueueName"]
+        priority["JobPriority"]
+        status["JobStatus"]
+        failed["FailedJob"]
+    end
+
+    subgraph Ports["Port Layer"]
+        driver["QueueDriver"]
+        repo["FailedJobRepository"]
+    end
+
+    subgraph Adapters["Adapter Layer"]
+        memory["MemoryDriver"]
+        redis["RedisDriver"]
+        database["DatabaseDriver"]
+        sync["SyncDriver"]
+    end
+
+    Application --> Domain
+    Domain --> Ports
+    Ports --> Adapters
+`} />
+
+## Getting Started
+
+<Steps>
+<Step>
+### Define a Job
+
+Create a job by implementing the `Queueable` interface:
 
 ```typescript
-import { Context, Effect, Layer, Queue, Fiber } from "effect"
+// src/jobs/SendWelcomeEmail.ts
+import { Effect, Duration } from "effect"
+import { Queueable, QueueName, JobPriority } from "@gello/queue-core"
 
-// 1) Define the service interface
-interface JobQueue<T> {
-  enqueue: (job: T) => Effect.Effect<void>
-  enqueueBatch: (jobs: T[]) => Effect.Effect<void>
-  process: (handler: (job: T) => Effect.Effect<void>) => Effect.Effect<never>
+interface SendWelcomeEmailPayload {
+  userId: string
+  email: string
+  name: string
 }
 
-class EmailQueue extends Context.Tag("EmailQueue")<
-  EmailQueue,
-  JobQueue<{ to: string; subject: string; body: string }>
->() {}
+export const SendWelcomeEmailJob: Queueable<SendWelcomeEmailPayload> = {
+  name: "SendWelcomeEmail",
+  queue: QueueName("emails"),
+  priority: JobPriority.NORMAL,
+  maxAttempts: 3,
+  timeout: Duration.seconds(30),
+  retryAfter: Duration.minutes(1),
 
-// 2) Create the Layer with Effect.Queue (in-memory) or Redis-backed
-const EmailQueueLive = Layer.scoped(
-  EmailQueue,
+  handle: (payload) =>
+    Effect.gen(function* () {
+      yield* Effect.log(`Sending welcome email to ${payload.email}`)
+      // Your email sending logic here
+      yield* Effect.log(`Welcome email sent to ${payload.name}`)
+    }),
+
+  onFailure: (payload, error) =>
+    Effect.log(`Failed to send email to ${payload.email}: ${error}`),
+}
+```
+</Step>
+
+<Step>
+### Create a Job Registry
+
+Register all your jobs in a central registry:
+
+```typescript
+// src/jobs/registry.ts
+import { Effect, Layer } from "effect"
+import { JobRegistryTag, makeJobRegistry } from "@gello/queue-core"
+import { SendWelcomeEmailJob } from "./SendWelcomeEmail"
+import { ProcessOrderJob } from "./ProcessOrder"
+
+export const JobRegistryLive = Layer.effect(
+  JobRegistryTag,
   Effect.gen(function* () {
-    const queue = yield* Queue.unbounded<{ to: string; subject: string; body: string }>()
+    const registry = yield* makeJobRegistry()
 
-    return {
-      enqueue: (job) => Queue.offer(queue, job),
-      enqueueBatch: (jobs) => Queue.offerAll(queue, jobs),
-      process: (handler) =>
-        Effect.forever(
-          Effect.gen(function* () {
-            const job = yield* Queue.take(queue)
-            yield* handler(job).pipe(
-              Effect.catchAll((e) => Effect.log(`Job failed: ${e}`))
-            )
-          })
-        )
-    }
+    yield* registry.register(SendWelcomeEmailJob)
+    yield* registry.register(ProcessOrderJob)
+
+    return registry
   })
 )
 ```
+</Step>
 
-## Redis-Backed Queue
+<Step>
+### Dispatch Jobs
+
+Use the `Queue` service to dispatch jobs from anywhere in your application:
 
 ```typescript
-import { Context, Effect, Layer, Stream, Schedule } from "effect"
+import { Effect, Duration } from "effect"
+import { QueueTag, QueueName } from "@gello/queue-core"
+import { SendWelcomeEmailJob } from "../jobs/SendWelcomeEmail"
 
-// Redis-backed queue with persistence
-const EmailQueueRedis = Layer.scoped(
-  EmailQueue,
+export const createUser = (userData: { email: string; name: string }) =>
   Effect.gen(function* () {
-    const redis = yield* Redis
-    const queueKey = "queue:email"
+    const queue = yield* QueueTag
 
-    return {
-      enqueue: (job) =>
-        Effect.tryPromise(() =>
-          redis.lpush(queueKey, JSON.stringify(job))
-        ).pipe(Effect.asVoid),
+    // Create user in database...
+    const userId = "user_123"
 
-      enqueueBatch: (jobs) =>
-        Effect.tryPromise(() =>
-          redis.lpush(queueKey, ...jobs.map((j) => JSON.stringify(j)))
-        ).pipe(Effect.asVoid),
+    // Dispatch welcome email job
+    const jobId = yield* queue.push(SendWelcomeEmailJob, {
+      userId,
+      email: userData.email,
+      name: userData.name,
+    })
 
-      process: (handler) =>
-        Effect.forever(
-          Effect.gen(function* () {
-            // Blocking pop with timeout
-            const result = yield* Effect.tryPromise(() =>
-              redis.brpop(queueKey, 5)
-            )
-            if (result) {
-              const job = JSON.parse(result[1])
-              yield* handler(job).pipe(
-                Effect.retry(Schedule.exponential("1 second").pipe(
-                  Schedule.compose(Schedule.recurs(3))
-                )),
-                Effect.catchAll((e) => Effect.log(`Job failed after retries: ${e}`))
-              )
-            }
-          })
-        )
-    }
-  })
-).pipe(Layer.provide(RedisLive))
-```
-
-## Dispatching Jobs
-
-```typescript
-HttpRouter.post("/users", Effect.gen(function* () {
-  const body = yield* HttpServerRequest.schemaBodyJson(CreateUser)
-  const repo = yield* UserRepo
-  const queue = yield* EmailQueue
-
-  const user = yield* repo.create(body)
-
-  // Dispatch welcome email job
-  yield* queue.enqueue({
-    to: user.email,
-    subject: "Welcome!",
-    body: "Thanks for signing up."
+    yield* Effect.log(`Queued welcome email job: ${jobId}`)
+    return { userId }
   })
 
-  return yield* HttpServerResponse.schemaJson(User)(user)
-}))
-```
-
-## Worker Process
-
-```typescript
-// src/worker.ts
-import { pipe } from "effect"
-import * as Effect from "effect/Effect"
-import * as Layer from "effect/Layer"
-import * as NodeRuntime from "@effect/platform-node/NodeRuntime"
-
-const WorkerLayer = Layer.scopedDiscard(
+// Dispatch with a delay
+export const scheduleReminder = (userId: string) =>
   Effect.gen(function* () {
-    const queue = yield* EmailQueue
-    const mailer = yield* MailService
-
-    yield* Effect.log("Worker started, processing jobs...")
-
-    // Fork the processor to run in background
-    yield* queue.process((job) =>
-      Effect.gen(function* () {
-        yield* mailer.send(job)
-        yield* Effect.log(`Sent email to ${job.to}`)
-      })
-    ).pipe(Effect.forkScoped)
+    const queue = yield* QueueTag
+    yield* queue.later(Duration.hours(24), SendReminderJob, { userId })
   })
+
+// Dispatch to a specific queue
+export const processUrgentOrder = (orderId: string) =>
+  Effect.gen(function* () {
+    const queue = yield* QueueTag
+    yield* queue.pushOn(QueueName("high-priority"), ProcessOrderJob, { orderId })
+  })
+```
+</Step>
+
+<Step>
+### Wire Up the Layers
+
+Compose all the layers together in your application:
+
+<Tabs items={['Development', 'Production']}>
+<Tab value="Development">
+```typescript
+import { Effect, Layer, pipe } from "effect"
+import { QueueLive, QueueTag } from "@gello/queue-core"
+import { MemoryDriverLive, MemoryFailedJobRepositoryLive } from "@gello/queue-drivers"
+import { JobRegistryLive } from "./jobs/registry"
+
+const DevQueueLayer = pipe(
+  QueueLive,
+  Layer.provide(MemoryDriverLive),
+  Layer.provide(MemoryFailedJobRepositoryLive),
+  Layer.provide(JobRegistryLive)
 )
 
-const MainLayer = pipe(
-  WorkerLayer,
-  Layer.provideMerge(EmailQueueRedis),
-  Layer.provideMerge(MailServiceLive),
-  Layer.provideMerge(RedisLive),
-  Layer.provideMerge(ConfigLive)
+const program = Effect.gen(function* () {
+  const queue = yield* QueueTag
+  yield* queue.push(SendWelcomeEmailJob, {
+    userId: "user_123",
+    email: "new@example.com",
+    name: "New User",
+  })
+})
+
+Effect.runPromise(program.pipe(Effect.provide(DevQueueLayer)))
+```
+</Tab>
+<Tab value="Production">
+```typescript
+import { Effect, Layer, pipe } from "effect"
+import { QueueLive, QueueTag } from "@gello/queue-core"
+import { RedisDriverLive, DatabaseFailedJobRepositoryLive } from "@gello/queue-drivers"
+import { JobRegistryLive } from "./jobs/registry"
+
+const ProdQueueLayer = pipe(
+  QueueLive,
+  Layer.provide(RedisDriverLive({
+    host: process.env.REDIS_HOST ?? "localhost",
+    port: Number(process.env.REDIS_PORT ?? 6379),
+  })),
+  Layer.provide(DatabaseFailedJobRepositoryLive),
+  Layer.provide(JobRegistryLive)
 )
 
-Layer.launch(MainLayer).pipe(NodeRuntime.runMain)
+const program = Effect.gen(function* () {
+  const queue = yield* QueueTag
+  yield* queue.push(SendWelcomeEmailJob, {
+    userId: "user_123",
+    email: "new@example.com",
+    name: "New User",
+  })
+})
+
+Effect.runPromise(program.pipe(Effect.provide(ProdQueueLayer)))
 ```
+</Tab>
+</Tabs>
+</Step>
+
+<Step>
+### Run the Worker
+
+Start a worker to process queued jobs:
 
 ```bash
-npx tsx src/worker.ts
+# Using NX
+npx nx serve queue-orchestrator
+
+# With options
+npx nx serve queue-orchestrator -- work --queue=emails --concurrency=4
 ```
 
-## Typed Job Definitions
+Or programmatically:
 
 ```typescript
-import * as S from "@effect/schema/Schema"
+import { Effect, Layer, Duration, pipe } from "effect"
+import { makeWorker, QueueName } from "@gello/queue-worker"
+import { MemoryDriverLive, MemoryFailedJobRepositoryLive } from "@gello/queue-drivers"
+import { JobRegistryLive } from "./jobs/registry"
 
-// Define job schemas
-const EmailJob = S.Struct({
-  to: S.String,
-  subject: S.String,
-  body: S.String,
-  priority: S.optional(S.Literal("low", "normal", "high")).pipe(
-    S.withDefault(() => "normal" as const)
-  )
-})
-
-const UploadJob = S.Struct({
-  userId: S.String,
-  fileUrl: S.String,
-  contentType: S.String
-})
-
-// Union of all job types
-const Job = S.Union(
-  S.Struct({ type: S.Literal("email"), data: EmailJob }),
-  S.Struct({ type: S.Literal("upload"), data: UploadJob })
+const WorkerLayer = pipe(
+  MemoryDriverLive,
+  Layer.provideMerge(MemoryFailedJobRepositoryLive),
+  Layer.provideMerge(JobRegistryLive)
 )
 
-type Job = S.Schema.Type<typeof Job>
-```
+const program = Effect.gen(function* () {
+  const worker = yield* makeWorker({
+    queue: QueueName("emails"),
+    concurrency: 2,
+    sleep: Duration.seconds(3),
+    tries: 3,
+    timeout: Duration.minutes(1),
+  })
 
-## Parallel Workers
+  yield* Effect.log("Starting worker...")
+  yield* worker.start()
+})
+
+Effect.runPromise(program.pipe(Effect.provide(WorkerLayer)))
+```
+</Step>
+</Steps>
+
+## Job Lifecycle
+
+Jobs flow through a defined lifecycle as they're processed:
+
+<Mermaid chart={`
+stateDiagram-v2
+    [*] --> pending: Job dispatched
+    pending --> reserved: Worker picks up
+    reserved --> processing: Handler starts
+    processing --> completed: Success
+    processing --> pending: Retry (attempts < max)
+    processing --> failed: Max attempts exceeded
+    failed --> buried: Moved to DLQ
+    completed --> [*]
+    buried --> [*]
+`} />
+
+## Domain Types
+
+### Core Types
 
 ```typescript
-// Run N workers in parallel
-const parallelWorkers = (n: number) =>
-  Layer.scopedDiscard(
-    Effect.gen(function* () {
-      const queue = yield* EmailQueue
-      const mailer = yield* MailService
+// Job identifier (branded string)
+type JobId = Brand.Branded<string, "JobId">
 
-      // Fork N workers
-      yield* Effect.all(
-        Array.from({ length: n }, (_, i) =>
-          queue.process((job) =>
-            Effect.gen(function* () {
-              yield* Effect.log(`Worker ${i}: processing job`)
-              yield* mailer.send(job)
-            })
-          ).pipe(Effect.forkScoped)
-        ),
-        { concurrency: "unbounded" }
+// Queue name (branded string)
+type QueueName = Brand.Branded<string, "QueueName">
+
+// Priority levels (higher = more urgent)
+type JobPriority = 0 | 1 | 2 | 3 | 4 | 5
+
+// Job status lifecycle
+type JobStatus =
+  | "pending"      // Waiting in queue
+  | "reserved"     // Picked up by worker
+  | "processing"   // Currently executing
+  | "completed"    // Successfully finished
+  | "failed"       // Failed after all retries
+  | "buried"       // Moved to dead letter queue
+```
+
+### Job Interface
+
+```typescript
+interface Job<T = unknown> {
+  readonly id: JobId
+  readonly queue: QueueName
+  readonly name: string
+  readonly payload: T
+  readonly priority: JobPriority
+  readonly attempts: number
+  readonly maxAttempts: number
+  readonly timeout: Duration.Duration
+  readonly retryAfter: Duration.Duration
+  readonly availableAt: Date
+  readonly createdAt: Date
+  readonly reservedAt?: Date
+}
+```
+
+### Queueable Contract
+
+```typescript
+interface Queueable<T, E = never, R = never> {
+  readonly name: string
+  readonly queue?: QueueName
+  readonly priority?: JobPriority
+  readonly maxAttempts?: number
+  readonly timeout?: Duration.Duration
+  readonly retryAfter?: Duration.Duration
+  readonly backoff?: Schedule.Schedule<unknown, unknown>
+
+  // The job handler
+  handle(payload: T): Effect.Effect<void, E, R>
+
+  // Optional hooks
+  beforeHandle?(payload: T): Effect.Effect<void, E, R>
+  afterHandle?(payload: T): Effect.Effect<void, E, R>
+  onFailure?(payload: T, error: E): Effect.Effect<void, never, R>
+}
+```
+
+## Drivers
+
+Choose the driver that best fits your deployment environment.
+
+<Mermaid chart={`
+graph LR
+    subgraph Drivers["Available Drivers"]
+        A[MemoryDriver] --> |Dev/Test| Q[QueueDriver Port]
+        B[RedisDriver] --> |Production| Q
+        C[DatabaseDriver] --> |SQL-backed| Q
+        D[SyncDriver] --> |Testing| Q
+    end
+`} />
+
+### Memory Driver
+
+In-memory queue using Effect.Queue. Perfect for development and testing.
+
+```typescript
+import { Layer } from "effect"
+import { MemoryDriverLive } from "@gello/queue-drivers"
+
+const MainLayer = Layer.provide(MyApp, MemoryDriverLive)
+```
+
+<Callout type="warn" title="Not for Production">
+Data is lost on restart. Single-process only.
+</Callout>
+
+### Redis Driver
+
+Production-ready driver using Redis lists and sorted sets.
+
+```typescript
+import { Layer } from "effect"
+import { RedisDriverLive } from "@gello/queue-drivers"
+
+const MainLayer = Layer.provide(
+  MyApp,
+  RedisDriverLive({
+    host: "localhost",
+    port: 6379,
+    password: "secret",
+    db: 0,
+    keyPrefix: "myapp:queue:",
+  })
+)
+```
+
+### Database Driver
+
+Persistent queue using SQL database with `FOR UPDATE SKIP LOCKED`.
+
+```typescript
+import { Layer } from "effect"
+import { DatabaseDriverLive } from "@gello/queue-drivers"
+
+const MainLayer = Layer.provide(
+  MyApp,
+  DatabaseDriverLive("queue_jobs")
+)
+```
+
+### Sync Driver
+
+Executes jobs immediately without queuing. Useful for testing.
+
+```typescript
+import { Layer } from "effect"
+import { SyncDriverLive } from "@gello/queue-drivers"
+
+const TestLayer = Layer.provide(MyApp, SyncDriverLive)
+```
+
+## Worker System
+
+### Worker Configuration
+
+```typescript
+interface WorkerConfig {
+  readonly queue: QueueName | ReadonlyArray<QueueName>
+  readonly concurrency: number
+  readonly sleep: Duration.Duration
+  readonly maxJobs?: number
+  readonly maxTime?: Duration.Duration
+  readonly timeout?: Duration.Duration
+  readonly tries?: number
+  readonly backoff?: Schedule.Schedule<unknown, unknown>
+  readonly stopOnEmpty?: boolean
+}
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `queue` | `QueueName \| QueueName[]` | `"default"` | Queue(s) to process |
+| `concurrency` | `number` | `1` | Concurrent workers |
+| `sleep` | `Duration` | `3s` | Sleep when empty |
+| `maxJobs` | `number?` | - | Stop after N jobs |
+| `maxTime` | `Duration?` | - | Stop after duration |
+| `timeout` | `Duration` | `60s` | Job timeout |
+| `tries` | `number` | `3` | Max retry attempts |
+| `stopOnEmpty` | `boolean` | `false` | Stop when empty |
+
+### Worker Pool
+
+Manage multiple workers across different queues:
+
+```typescript
+import { makeWorkerPool, WorkerPoolConfig } from "@gello/queue-worker"
+
+const poolConfig: WorkerPoolConfig = {
+  workers: [
+    { queue: QueueName("emails"), concurrency: 4 },
+    { queue: QueueName("reports"), concurrency: 2 },
+    { queue: QueueName("default"), concurrency: 1 },
+  ],
+}
+
+const program = Effect.gen(function* () {
+  const pool = yield* makeWorkerPool(poolConfig)
+  yield* pool.startAll()
+})
+```
+
+### Worker Lifecycle
+
+```typescript
+const worker = yield* makeWorker(config)
+
+// Start processing
+yield* worker.start()
+
+// Pause processing (graceful)
+yield* worker.pause()
+
+// Resume processing
+yield* worker.resume()
+
+// Stop processing (graceful)
+yield* worker.stop()
+
+// Get current status
+const status = yield* worker.status()
+console.log(status.processedCount, status.failedCount)
+```
+
+## Queue Service API
+
+| Method | Description |
+|--------|-------------|
+| `push(job, payload)` | Push job to default queue |
+| `pushOn(queue, job, payload)` | Push job to specific queue |
+| `later(delay, job, payload)` | Push job with delay |
+| `bulk(jobs)` | Push multiple jobs |
+| `size(queue?)` | Get queue size |
+| `clear(queue?)` | Clear queue |
+
+## CLI Commands
+
+Manage queues from the command line:
+
+```bash
+# Start worker
+npx nx serve queue-orchestrator -- work --queue=emails --concurrency=4
+
+# Check queue status
+npx nx serve queue-orchestrator -- status
+
+# List failed jobs
+npx nx serve queue-orchestrator -- failed
+
+# Retry a failed job
+npx nx serve queue-orchestrator -- retry <job-id>
+
+# Retry all failed jobs
+npx nx serve queue-orchestrator -- retry-all
+
+# Clear a queue
+npx nx serve queue-orchestrator -- clear --queue=emails
+
+# Get help
+npx nx serve queue-orchestrator -- help
+```
+
+## Job Examples
+
+### Email Job
+
+```typescript
+import { Effect } from "effect"
+import * as S from "@effect/schema/Schema"
+
+const SendEmailPayload = S.Struct({
+  to: S.String.pipe(S.pattern(/@/)),
+  subject: S.String.pipe(S.minLength(1)),
+  body: S.String,
+  attachments: S.optional(S.Array(S.String)),
+})
+
+type SendEmailPayload = S.Schema.Type<typeof SendEmailPayload>
+
+export const SendEmailJob: Queueable<SendEmailPayload> = {
+  name: "SendEmail",
+  queue: QueueName("emails"),
+  priority: JobPriority.NORMAL,
+  maxAttempts: 3,
+  timeout: Duration.seconds(30),
+
+  handle: (payload) =>
+    Effect.gen(function* () {
+      const email = yield* EmailService
+      yield* email.send({
+        to: payload.to,
+        subject: payload.subject,
+        body: payload.body,
+      })
+      yield* Effect.log(`Email sent to ${payload.to}`)
+    }),
+
+  onFailure: (payload, error) =>
+    Effect.logError(`Failed to send email to ${payload.to}: ${error}`),
+}
+```
+
+### Batch Processing Job
+
+```typescript
+export const ProcessReportJob: Queueable<ProcessReportPayload> = {
+  name: "ProcessReport",
+  queue: QueueName("reports"),
+  priority: JobPriority.LOW,
+  maxAttempts: 1,
+  timeout: Duration.hours(1),
+
+  handle: (payload) =>
+    Effect.gen(function* () {
+      const storage = yield* Storage
+      const db = yield* Database
+
+      const records = yield* db.stream(
+        sql`SELECT * FROM transactions WHERE report_id = ${payload.reportId}`
       )
 
-      yield* Effect.log(`Started ${n} workers`)
-    })
-  )
+      let processed = 0
+      yield* Stream.runForEach(records, (record) =>
+        Effect.gen(function* () {
+          yield* processRecord(record)
+          processed++
+          if (processed % 1000 === 0) {
+            yield* Effect.log(`Processed ${processed} records`)
+          }
+        })
+      )
+
+      const report = yield* generateReport(payload.reportId)
+      yield* storage.put(`reports/${payload.reportId}.pdf`, report)
+    }),
+}
 ```
 
 ## Testing
@@ -231,31 +623,175 @@ const createTestQueue = <T>() => {
   const processed: T[] = []
 
   return {
-    layer: Layer.succeed(EmailQueue, {
-      enqueue: (job) => Effect.sync(() => { jobs.push(job) }),
-      enqueueBatch: (batch) => Effect.sync(() => { jobs.push(...batch) }),
-      process: (handler) =>
-        Effect.gen(function* () {
-          while (jobs.length > 0) {
-            const job = jobs.shift()!
-            yield* handler(job)
-            processed.push(job)
-          }
-        })
+    layer: Layer.succeed(QueueTag, {
+      push: (job, payload) => Effect.sync(() => {
+        jobs.push({ job, payload } as T)
+        return JobId("test-job-id")
+      }),
+      // ... other methods
     }),
     getEnqueued: () => jobs,
-    getProcessed: () => processed
+    getProcessed: () => processed,
+    assertJobEnqueued: (name: string) =>
+      Effect.sync(() => {
+        const found = jobs.find((j: any) => j.job.name === name)
+        if (!found) throw new Error(`Job ${name} not enqueued`)
+      }),
   }
 }
 
 // Usage in tests
-const testQueue = createTestQueue()
+describe("UserService", () => {
+  it("enqueues welcome email on user creation", async () => {
+    const testQueue = createTestQueue()
 
-await Effect.runPromise(
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        yield* createUser({ email: "test@example.com", name: "Test" })
+        yield* testQueue.assertJobEnqueued("SendWelcomeEmail")
+      }).pipe(Effect.provide(testQueue.layer))
+    )
+  })
+})
+```
+
+## Database Schema
+
+For the DatabaseDriver, use these migrations:
+
+```sql
+-- Queue jobs table (PostgreSQL)
+CREATE TABLE IF NOT EXISTS queue_jobs (
+  id UUID PRIMARY KEY,
+  queue VARCHAR(255) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  payload JSONB NOT NULL,
+  priority INTEGER DEFAULT 0 NOT NULL,
+  attempts INTEGER DEFAULT 0 NOT NULL,
+  max_attempts INTEGER DEFAULT 3 NOT NULL,
+  timeout_ms BIGINT DEFAULT 60000 NOT NULL,
+  retry_after_ms BIGINT DEFAULT 60000 NOT NULL,
+  available_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  reserved_at TIMESTAMPTZ
+);
+
+CREATE INDEX idx_queue_jobs_queue_available
+ON queue_jobs (queue, available_at)
+WHERE reserved_at IS NULL;
+
+-- Failed jobs table
+CREATE TABLE IF NOT EXISTS failed_jobs (
+  id UUID PRIMARY KEY,
+  queue VARCHAR(255) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  payload JSONB NOT NULL,
+  exception TEXT NOT NULL,
+  failed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+## Configuration
+
+### Environment Variables
+
+```bash
+# Queue driver
+QUEUE_DRIVER=redis  # redis | database | memory | sync
+
+# Redis configuration
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DB=0
+QUEUE_PREFIX=gello:queue:
+
+# Database (for database driver or failed jobs)
+DATABASE_URL=postgres://user:pass@localhost:5432/myapp
+
+# Worker defaults
+QUEUE_DEFAULT=default
+QUEUE_RETRY_AFTER=60
+QUEUE_MAX_TRIES=3
+QUEUE_TIMEOUT=60
+```
+
+## Complete Example
+
+A full working example showing the entire flow:
+
+```typescript
+import { Effect, Layer, Duration, pipe } from "effect"
+import {
+  QueueTag,
+  QueueLive,
+  JobRegistryTag,
+  makeJobRegistry,
+  Queueable,
+  QueueName,
+  JobPriority
+} from "@gello/queue-core"
+import { MemoryDriverLive, MemoryFailedJobRepositoryLive } from "@gello/queue-drivers"
+import { makeWorker } from "@gello/queue-worker"
+
+// 1. Define a job
+interface GreetPayload {
+  name: string
+}
+
+const GreetJob: Queueable<GreetPayload> = {
+  name: "Greet",
+  queue: QueueName("default"),
+  priority: JobPriority.NORMAL,
+  maxAttempts: 3,
+  timeout: Duration.seconds(10),
+
+  handle: (payload) =>
+    Effect.gen(function* () {
+      yield* Effect.log(`Hello, ${payload.name}!`)
+    }),
+}
+
+// 2. Create registry layer
+const JobRegistryLive = Layer.effect(
+  JobRegistryTag,
   Effect.gen(function* () {
-    const queue = yield* EmailQueue
-    yield* queue.enqueue({ to: "test@test.com", subject: "Test", body: "Hello" })
-    expect(testQueue.getEnqueued()).toHaveLength(1)
-  }).pipe(Effect.provide(testQueue.layer))
+    const registry = yield* makeJobRegistry()
+    yield* registry.register(GreetJob)
+    return registry
+  })
 )
+
+// 3. Compose layers
+const MainLayer = pipe(
+  QueueLive,
+  Layer.provide(MemoryDriverLive),
+  Layer.provide(MemoryFailedJobRepositoryLive),
+  Layer.provide(JobRegistryLive)
+)
+
+// 4. Run program
+const program = Effect.gen(function* () {
+  const queue = yield* QueueTag
+
+  // Dispatch jobs
+  yield* queue.push(GreetJob, { name: "Alice" })
+  yield* queue.push(GreetJob, { name: "Bob" })
+  yield* queue.push(GreetJob, { name: "Charlie" })
+
+  yield* Effect.log("Jobs queued, starting worker...")
+
+  // Start worker
+  const worker = yield* makeWorker({
+    queue: QueueName("default"),
+    concurrency: 1,
+    sleep: Duration.seconds(1),
+    stopOnEmpty: true,
+  })
+
+  yield* worker.start()
+  yield* Effect.log("All jobs processed!")
+})
+
+Effect.runPromise(program.pipe(Effect.provide(MainLayer)))
 ```

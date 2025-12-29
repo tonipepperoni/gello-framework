@@ -1,17 +1,32 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { DocsContent, CodeBlock } from '../../components';
+import { DocsContent, CodeBlock, type TOCItem } from '../../components';
+import { getPageNavigation } from '../../lib/source';
 
 export const Route = createFileRoute('/docs/middleware')({
   component: MiddlewarePage,
 });
 
+const toc: TOCItem[] = [
+  { title: 'The Pattern', url: '#the-pattern', depth: 2 },
+  { title: 'Custom Middleware', url: '#custom-middleware', depth: 2 },
+  { title: 'Authentication Middleware', url: '#authentication-middleware', depth: 2 },
+  { title: 'CORS Middleware', url: '#cors-middleware', depth: 2 },
+  { title: 'Rate Limiting', url: '#rate-limiting', depth: 2 },
+  { title: 'Composing Middleware', url: '#composing-middleware', depth: 2 },
+  { title: 'Route-Specific Middleware', url: '#route-specific-middleware', depth: 2 },
+];
+
 function MiddlewarePage() {
+  const footer = getPageNavigation('/docs/middleware');
+
   return (
     <DocsContent
       title="Middleware"
       description="Composable request/response transformations using Effect"
+      toc={toc}
+      footer={footer}
     >
-      <h2>The Pattern</h2>
+      <h2 id="the-pattern">The Pattern</h2>
       <p>
         Middleware in Gello are functions that wrap handlers, transforming requests or responses.
         They compose naturally using <code>pipe</code> and can access/provide context.
@@ -28,7 +43,7 @@ const HttpApp = pipe(
   withLogging
 )`} />
 
-      <h2>Custom Middleware</h2>
+      <h2 id="custom-middleware">Custom Middleware</h2>
       <CodeBlock code={`const withTiming = HttpMiddleware.make((app) =>
   Effect.gen(function* () {
     const start = Date.now()
@@ -41,7 +56,7 @@ const HttpApp = pipe(
   })
 )`} />
 
-      <h2>Authentication Middleware</h2>
+      <h2 id="authentication-middleware">Authentication Middleware</h2>
       <CodeBlock code={`class CurrentUser extends Context.Tag("CurrentUser")<
   CurrentUser,
   { id: string; email: string; role: string }
@@ -67,7 +82,7 @@ const withAuth = HttpMiddleware.make((app) =>
   })
 )`} />
 
-      <h2>CORS Middleware</h2>
+      <h2 id="cors-middleware">CORS Middleware</h2>
       <CodeBlock code={`const cors = (options: { origins: string | string[] }) =>
   HttpMiddleware.make((app) =>
     Effect.gen(function* () {
@@ -92,7 +107,7 @@ const withAuth = HttpMiddleware.make((app) =>
     })
   )`} />
 
-      <h2>Rate Limiting</h2>
+      <h2 id="rate-limiting">Rate Limiting</h2>
       <CodeBlock code={`const withRateLimit = (limit: number, window: Duration.Duration) =>
   HttpMiddleware.make((app) =>
     Effect.gen(function* () {
@@ -120,7 +135,7 @@ const withAuth = HttpMiddleware.make((app) =>
     })
   )`} />
 
-      <h2>Composing Middleware</h2>
+      <h2 id="composing-middleware">Composing Middleware</h2>
       <CodeBlock code={`// Middleware compose left-to-right
 const HttpApp = pipe(
   HttpRouter.toHttpApp(AppRouter),
@@ -130,7 +145,7 @@ const HttpApp = pipe(
   withRateLimit(100, Duration.minutes(1)) // 4. Rate limit
 )`} />
 
-      <h2>Route-Specific Middleware</h2>
+      <h2 id="route-specific-middleware">Route-Specific Middleware</h2>
       <CodeBlock code={`// Apply middleware to specific routes
 const PublicRouter = pipe(
   HttpRouter.empty,

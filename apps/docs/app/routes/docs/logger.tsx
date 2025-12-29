@@ -1,17 +1,40 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { DocsContent, CodeBlock, Callout } from '../../components';
+import { DocsContent, CodeBlock, Callout, type TOCItem } from '../../components';
+import { getPageNavigation } from '../../lib/source';
 
 export const Route = createFileRoute('/docs/logger')({
   component: LoggerPage,
 });
 
+const toc: TOCItem[] = [
+  { title: 'Architecture Overview', url: '#architecture-overview', depth: 2 },
+  { title: 'Quick Start', url: '#quick-start', depth: 2 },
+  { title: 'Log Levels', url: '#log-levels', depth: 2 },
+  { title: 'Using the Logger', url: '#using-the-logger', depth: 2 },
+  { title: 'Child Loggers & Context', url: '#child-loggers-context', depth: 2 },
+  { title: 'Drivers', url: '#drivers', depth: 2 },
+  { title: 'Console Driver', url: '#console-driver', depth: 3 },
+  { title: 'Pretty Driver', url: '#pretty-driver', depth: 3 },
+  { title: 'JSON Driver', url: '#json-driver', depth: 3 },
+  { title: 'File Driver', url: '#file-driver', depth: 3 },
+  { title: 'Multi Driver', url: '#multi-driver', depth: 3 },
+  { title: 'Environment Presets', url: '#environment-presets', depth: 2 },
+  { title: 'Testing with Mock Logger', url: '#testing-with-mock-logger', depth: 2 },
+  { title: 'Redaction', url: '#redaction', depth: 2 },
+  { title: 'Best Practices', url: '#best-practices', depth: 2 },
+];
+
 function LoggerPage() {
+  const footer = getPageNavigation('/docs/logger');
+
   return (
     <DocsContent
       title="Logger"
       description="A comprehensive logging solution with multiple drivers, following hexagonal DDD architecture. Built on Effect with pretty printing, structured JSON output, and file rotation."
+      toc={toc}
+      footer={footer}
     >
-      <h2>Architecture Overview</h2>
+      <h2 id="architecture-overview">Architecture Overview</h2>
       <p>
         The logger follows a <strong>Ports & Adapters</strong> (hexagonal) architecture pattern,
         separating concerns into three layers:
@@ -22,7 +45,7 @@ function LoggerPage() {
         <li><strong>Adapters (Drivers)</strong> - Concrete implementations for different outputs</li>
       </ul>
 
-      <h2>Quick Start</h2>
+      <h2 id="quick-start">Quick Start</h2>
       <CodeBlock code={`import { Effect } from "effect";
 import { Logger, developmentLogger, logInfo } from "@gello/core-config";
 
@@ -38,7 +61,7 @@ Effect.runPromise(
   program.pipe(Effect.provide(developmentLogger()))
 );`} />
 
-      <h2>Log Levels</h2>
+      <h2 id="log-levels">Log Levels</h2>
       <CodeBlock code={`type LogLevel = "trace" | "debug" | "info" | "warning" | "error" | "fatal";
 
 // Level ordering (lowest to highest severity)
@@ -50,7 +73,7 @@ import { shouldLog } from "@gello/core-contracts";
 shouldLog("debug", "info");  // false (debug < info minimum)
 shouldLog("error", "info");  // true  (error >= info minimum)`} />
 
-      <h2>Using the Logger</h2>
+      <h2 id="using-the-logger">Using the Logger</h2>
       <CodeBlock code={`import { Effect } from "effect";
 import { Logger } from "@gello/core-contracts";
 
@@ -77,7 +100,7 @@ const simpler = Effect.gen(function* () {
   yield* logError("Operation failed", new Error("timeout"), { attempt: 3 });
 });`} />
 
-      <h2>Child Loggers & Context</h2>
+      <h2 id="child-loggers-context">Child Loggers & Context</h2>
       <Callout type="info">
         Create child loggers with inherited context for request scoping.
         All logs from a child logger include the parent context.
@@ -105,9 +128,9 @@ const simpler = Effect.gen(function* () {
     yield* orderLogger.info("Order processed");
   });`} />
 
-      <h2>Drivers</h2>
+      <h2 id="drivers">Drivers</h2>
 
-      <h3>Console Driver</h3>
+      <h3 id="console-driver">Console Driver</h3>
       <p>Simple colorized output to stdout/stderr:</p>
       <CodeBlock code={`import { consoleDriver } from "@gello/adapters-logger";
 
@@ -116,7 +139,7 @@ const driver = consoleDriver({
   timestamps: true,  // Include timestamps
 });`} />
 
-      <h3>Pretty Driver</h3>
+      <h3 id="pretty-driver">Pretty Driver</h3>
       <p>Human-readable output with icons and colors:</p>
       <CodeBlock code={`import { prettyDriver } from "@gello/adapters-logger";
 
@@ -134,7 +157,7 @@ const driver = prettyDriver({
 //       "ip": "192.168.1.1"
 //     }`} />
 
-      <h3>JSON Driver</h3>
+      <h3 id="json-driver">JSON Driver</h3>
       <p>Structured JSON for log aggregators (ELK, Datadog, etc.):</p>
       <CodeBlock code={`import { jsonDriver } from "@gello/adapters-logger";
 
@@ -145,7 +168,7 @@ const driver = jsonDriver({
 // Output example:
 // {"timestamp":"2024-01-15T14:32:45.123Z","level":"info","message":"User logged in"}`} />
 
-      <h3>File Driver</h3>
+      <h3 id="file-driver">File Driver</h3>
       <p>Write to files with automatic rotation and compression:</p>
       <CodeBlock code={`import { Effect, Scope } from "effect";
 import { fileDriver } from "@gello/adapters-logger";
@@ -164,7 +187,7 @@ const program = Effect.scoped(
   })
 );`} />
 
-      <h3>Multi Driver</h3>
+      <h3 id="multi-driver">Multi Driver</h3>
       <p>Combine multiple drivers for simultaneous output:</p>
       <CodeBlock code={`import { multiDriver, prettyDriver, jsonDriver } from "@gello/adapters-logger";
 
@@ -174,7 +197,7 @@ const driver = multiDriver([
   jsonDriver({ includeStack: true }),
 ]);`} />
 
-      <h2>Environment Presets</h2>
+      <h2 id="environment-presets">Environment Presets</h2>
       <CodeBlock code={`import {
   developmentLogger,
   productionLogger,
@@ -198,7 +221,7 @@ const stagingLayer = stagingLogger();
 // Auto-detect from NODE_ENV
 const autoLayer = environmentLogger();`} />
 
-      <h2>Testing with Mock Logger</h2>
+      <h2 id="testing-with-mock-logger">Testing with Mock Logger</h2>
       <CodeBlock code={`import {
   createMockLogger,
   withMockLogger,
@@ -228,7 +251,7 @@ const silentTest = myFunction().pipe(
   Effect.provide(silentLoggerLayer)
 );`} />
 
-      <h2>Redaction</h2>
+      <h2 id="redaction">Redaction</h2>
       <p>Automatically redact sensitive data from logs:</p>
       <CodeBlock code={`import { makeLogger } from "@gello/domain-logger";
 import { prettyDriver } from "@gello/adapters-logger";
@@ -256,7 +279,7 @@ yield* logger.info("User login", {
   token: "abc123",        // Logged as: [REDACTED]
 });`} />
 
-      <h2>Best Practices</h2>
+      <h2 id="best-practices">Best Practices</h2>
       <ul>
         <li>
           <strong>Use child loggers</strong> for request scoping — attach <code>requestId</code> early

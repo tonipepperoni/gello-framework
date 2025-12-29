@@ -12,20 +12,38 @@ import {
   Folder,
   Card,
   Cards,
-  TypeTable,
+  type TOCItem,
 } from '../../components';
+import { getPageNavigation } from '../../lib/source';
 
 export const Route = createFileRoute('/docs/installation')({
   component: InstallationPage,
 });
 
+const toc: TOCItem[] = [
+  { title: 'Quick Start (Recommended)', url: '#quick-start', depth: 2 },
+  { title: 'Manual Installation', url: '#manual-installation', depth: 2 },
+  { title: 'Core Packages', url: '#core-packages', depth: 3 },
+  { title: 'Optional Packages', url: '#optional-packages', depth: 3 },
+  { title: 'Database (Drizzle + Postgres)', url: '#database', depth: 3 },
+  { title: 'Package Overview', url: '#package-overview', depth: 2 },
+  { title: 'Project Structure', url: '#project-structure', depth: 2 },
+  { title: 'TypeScript Config', url: '#typescript-config', depth: 2 },
+  { title: 'Entry Point', url: '#entry-point', depth: 2 },
+  { title: 'Development', url: '#development', depth: 2 },
+];
+
 function InstallationPage() {
+  const footer = getPageNavigation('/docs/installation');
+
   return (
     <DocsContent
       title="Installation"
       description="Get started with Gello in seconds using the CLI"
+      toc={toc}
+      footer={footer}
     >
-      <h2>Quick Start (Recommended)</h2>
+      <h2 id="quick-start">Quick Start (Recommended)</h2>
       <Steps>
         <Step>
           <h3>Create a new project</h3>
@@ -47,12 +65,12 @@ pnpm install`} />
         This creates a complete project with Effect, HTTP server, and example routes — ready to go.
       </Callout>
 
-      <h2>Manual Installation</h2>
+      <h2 id="manual-installation">Manual Installation</h2>
       <p>
         If you prefer to add Gello to an existing project, install the packages directly:
       </p>
 
-      <h3>Core Packages</h3>
+      <h3 id="core-packages">Core Packages</h3>
       <Tabs items={['pnpm', 'npm', 'yarn']} persist groupId="pkg">
         <Tab value="pnpm">
           <CodeBlock lang="bash" code={`# Core framework
@@ -77,7 +95,7 @@ yarn add effect @effect/platform @effect/platform-node @effect/schema`} />
         </Tab>
       </Tabs>
 
-      <h3>Optional Packages</h3>
+      <h3 id="optional-packages">Optional Packages</h3>
       <CodeBlock lang="bash" code={`# Queue system
 pnpm add @gello/queue
 
@@ -87,11 +105,11 @@ pnpm add @gello/fp
 # Testing utilities
 pnpm add -D @gello/testing`} />
 
-      <h3>Database (Drizzle + Postgres)</h3>
+      <h3 id="database">Database (Drizzle + Postgres)</h3>
       <CodeBlock lang="bash" code={`pnpm add drizzle-orm pg
 pnpm add -D drizzle-kit @types/pg`} />
 
-      <h2>Package Overview</h2>
+      <h2 id="package-overview">Package Overview</h2>
       <Cards>
         <Card title="@gello/core" description="Core contracts, errors, and base types" />
         <Card title="@gello/common" description="Middleware, routing, validation utilities" />
@@ -101,7 +119,7 @@ pnpm add -D drizzle-kit @types/pg`} />
         <Card title="@gello/testing" description="Testing utilities and mocks" />
       </Cards>
 
-      <h2>Project Structure</h2>
+      <h2 id="project-structure">Project Structure</h2>
       <Files>
         <Folder name="src" defaultOpen>
           <File name="main.ts" />
@@ -124,7 +142,7 @@ pnpm add -D drizzle-kit @types/pg`} />
         <File name="tsconfig.json" />
       </Files>
 
-      <h2>TypeScript Config</h2>
+      <h2 id="typescript-config">TypeScript Config</h2>
       <CodeBlock lang="json" code={`{
   "compilerOptions": {
     "strict": true,
@@ -138,7 +156,7 @@ pnpm add -D drizzle-kit @types/pg`} />
   }
 }`} />
 
-      <h2>Entry Point</h2>
+      <h2 id="entry-point">Entry Point</h2>
       <CodeBlock lang="typescript" code={`// src/main.ts
 import { pipe } from "effect"
 import * as Layer from "effect/Layer"
@@ -159,7 +177,7 @@ const MainLayer = pipe(
 
 Layer.launch(MainLayer).pipe(NodeRuntime.runMain)`} />
 
-      <h2>Development</h2>
+      <h2 id="development">Development</h2>
       <CodeBlock lang="bash" code={`# Start development server with hot reload
 pnpm dev
 

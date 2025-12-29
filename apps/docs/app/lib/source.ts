@@ -38,3 +38,26 @@ export const pageTree: PageTree.Root = {
     { type: 'page', name: 'CLI', url: '/docs/cli' },
   ],
 };
+
+// Get all pages (flatten tree, exclude separators)
+function getPages(): Array<{ name: string; url: string }> {
+  return pageTree.children
+    .filter((item): item is PageTree.Item & { type: 'page' } => item.type === 'page')
+    .map((item) => ({ name: item.name, url: item.url }));
+}
+
+// Get prev/next pages for navigation
+export function getPageNavigation(currentUrl: string): {
+  previous?: { name: string; url: string };
+  next?: { name: string; url: string };
+} {
+  const pages = getPages();
+  const currentIndex = pages.findIndex((p) => p.url === currentUrl);
+
+  if (currentIndex === -1) return {};
+
+  return {
+    previous: currentIndex > 0 ? pages[currentIndex - 1] : undefined,
+    next: currentIndex < pages.length - 1 ? pages[currentIndex + 1] : undefined,
+  };
+}

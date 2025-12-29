@@ -1,17 +1,33 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { DocsContent, CodeBlock, Tabs, Tab } from '../../components';
+import { DocsContent, CodeBlock, Tabs, Tab, type TOCItem } from '../../components';
+import { getPageNavigation } from '../../lib/source';
 
 export const Route = createFileRoute('/docs/database')({
   component: DatabasePage,
 });
 
+const toc: TOCItem[] = [
+  { title: 'Setup', url: '#setup', depth: 2 },
+  { title: 'Connection Pool Layer', url: '#connection-pool-layer', depth: 2 },
+  { title: 'Drizzle Layer', url: '#drizzle-layer', depth: 2 },
+  { title: 'Schema Definition', url: '#schema-definition', depth: 2 },
+  { title: 'Repository Pattern', url: '#repository-pattern', depth: 2 },
+  { title: 'Transactions', url: '#transactions', depth: 2 },
+  { title: 'Queries with Joins', url: '#queries-with-joins', depth: 2 },
+  { title: 'Testing with Test Database', url: '#testing-with-test-database', depth: 2 },
+];
+
 function DatabasePage() {
+  const footer = getPageNavigation('/docs/database');
+
   return (
     <DocsContent
       title="Database"
       description="Type-safe database access with Drizzle ORM and Effect's resource management"
+      toc={toc}
+      footer={footer}
     >
-      <h2>Setup</h2>
+      <h2 id="setup">Setup</h2>
       <Tabs items={['pnpm', 'npm', 'yarn']}>
         <Tab value="pnpm">
           <CodeBlock lang="bash" code={`pnpm add drizzle-orm pg
@@ -27,7 +43,7 @@ yarn add -D drizzle-kit @types/pg`} />
         </Tab>
       </Tabs>
 
-      <h2>Connection Pool Layer</h2>
+      <h2 id="connection-pool-layer">Connection Pool Layer</h2>
       <p>
         The database pool is a scoped resource — acquired on startup, released on shutdown.
       </p>
@@ -59,7 +75,7 @@ const PgPoolLive = Layer.scoped(
   )
 ).pipe(Layer.provide(ConfigLive))`} />
 
-      <h2>Drizzle Layer</h2>
+      <h2 id="drizzle-layer">Drizzle Layer</h2>
       <CodeBlock code={`import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres"
 import * as schema from "./schema"
 
@@ -76,7 +92,7 @@ const DbLive = Layer.effect(
   })
 ).pipe(Layer.provide(PgPoolLive))`} />
 
-      <h2>Schema Definition</h2>
+      <h2 id="schema-definition">Schema Definition</h2>
       <CodeBlock code={`// src/lib/db/schema.ts
 import { pgTable, text, timestamp, boolean } from "drizzle-orm/pg-core"
 
@@ -97,7 +113,7 @@ export const posts = pgTable("posts", {
   createdAt: timestamp("created_at").defaultNow().notNull()
 })`} />
 
-      <h2>Repository Pattern</h2>
+      <h2 id="repository-pattern">Repository Pattern</h2>
       <CodeBlock code={`import { eq } from "drizzle-orm"
 import { users } from "../lib/db/schema"
 
@@ -128,7 +144,7 @@ export const UserRepoLive = Layer.effect(
   })
 )`} />
 
-      <h2>Transactions</h2>
+      <h2 id="transactions">Transactions</h2>
       <CodeBlock code={`const transferFunds = (fromId: string, toId: string, amount: number) =>
   Effect.gen(function* () {
     const db = yield* Db
@@ -148,7 +164,7 @@ export const UserRepoLive = Layer.effect(
     )
   })`} />
 
-      <h2>Queries with Joins</h2>
+      <h2 id="queries-with-joins">Queries with Joins</h2>
       <CodeBlock code={`const getPostWithAuthor = (postId: string) =>
   Effect.gen(function* () {
     const db = yield* Db
@@ -165,7 +181,7 @@ export const UserRepoLive = Layer.effect(
     return result
   })`} />
 
-      <h2>Testing with Test Database</h2>
+      <h2 id="testing-with-test-database">Testing with Test Database</h2>
       <CodeBlock code={`// Use a test database
 const ConfigTest = Layer.succeed(Config, {
   DATABASE_URL: "postgres://localhost/myapp_test",

@@ -44,7 +44,7 @@ export {
 } from 'fumadocs-ui/page';
 
 // Custom wrapper for consistent page structure
-export { DocsContent } from './DocsContent';
+export { DocsContent, type TOCItem } from './DocsContent';
 
 // Mermaid diagrams
 export { Mermaid } from './Mermaid';

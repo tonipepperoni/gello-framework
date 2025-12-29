@@ -1,17 +1,34 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { DocsContent, CodeBlock, Callout } from '../../components';
+import { DocsContent, CodeBlock, Callout, type TOCItem } from '../../components';
+import { getPageNavigation } from '../../lib/source';
 
 export const Route = createFileRoute('/docs/dependency-injection')({
   component: DependencyInjectionPage,
 });
 
+const toc: TOCItem[] = [
+  { title: 'The Pattern', url: '#the-pattern', depth: 2 },
+  { title: 'Defining Services', url: '#defining-services', depth: 2 },
+  { title: 'Implementing Layers', url: '#implementing-layers', depth: 2 },
+  { title: 'Scoped Resources', url: '#scoped-resources', depth: 2 },
+  { title: 'Drizzle on Top of Pool', url: '#drizzle-on-top-of-pool', depth: 2 },
+  { title: 'Using in Handlers', url: '#using-in-handlers', depth: 2 },
+  { title: 'Composing at the Edge', url: '#composing-at-the-edge', depth: 2 },
+  { title: 'Testing with Mocks', url: '#testing-with-mocks', depth: 2 },
+  { title: 'Why No Modules?', url: '#why-no-modules', depth: 2 },
+];
+
 function DependencyInjectionPage() {
+  const footer = getPageNavigation('/docs/dependency-injection');
+
   return (
     <DocsContent
       title="Dependency Injection"
       description="Context.Tag + Layer — NestJS-style modularity with functional composition"
+      toc={toc}
+      footer={footer}
     >
-      <h2>The Pattern</h2>
+      <h2 id="the-pattern">The Pattern</h2>
       <p>
         Gello's dependency injection takes inspiration from NestJS's service-oriented architecture,
         but implements it using Effect's functional primitives. Instead of decorators and a runtime
@@ -19,7 +36,7 @@ function DependencyInjectionPage() {
         and <code>Layer</code> to provide implementations — all type-safe and composable.
       </p>
 
-      <h2>Defining Services</h2>
+      <h2 id="defining-services">Defining Services</h2>
       <CodeBlock code={`import { Context, Effect, Layer } from "effect"
 
 // 1) Define the service interface with Context.Tag
@@ -34,7 +51,7 @@ class UserRepo extends Context.Tag("UserRepo")<
 
 // The tag IS the type — no separate interface needed`} />
 
-      <h2>Implementing Layers</h2>
+      <h2 id="implementing-layers">Implementing Layers</h2>
       <CodeBlock code={`// Layer.effect — sync/async implementation
 const UserRepoLive = Layer.effect(
   UserRepo,
@@ -77,7 +94,7 @@ const UserRepoWithDeps = UserRepoLive.pipe(
   Layer.provide(RedisLive)
 )`} />
 
-      <h2>Scoped Resources</h2>
+      <h2 id="scoped-resources">Scoped Resources</h2>
       <Callout type="info" title="Resource Lifecycle">
         Use <code>Layer.scoped</code> with <code>acquireRelease</code> for resources that need cleanup,
         like database pools and Redis connections.
@@ -107,7 +124,7 @@ const PgPoolLive = Layer.scoped(
   )
 ).pipe(Layer.provide(ConfigLive))`} />
 
-      <h2>Drizzle on Top of Pool</h2>
+      <h2 id="drizzle-on-top-of-pool">Drizzle on Top of Pool</h2>
       <CodeBlock code={`import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres"
 
 class Db extends Context.Tag("Db")<Db, NodePgDatabase>() {}
@@ -121,7 +138,7 @@ const DbLive = Layer.effect(
   })
 ).pipe(Layer.provide(PgPoolLive))`} />
 
-      <h2>Using in Handlers</h2>
+      <h2 id="using-in-handlers">Using in Handlers</h2>
       <CodeBlock code={`HttpRouter.get("/users/:id", Effect.gen(function* () {
   // Just yield* the tag — Effect tracks what's needed
   const repo = yield* UserRepo
@@ -133,7 +150,7 @@ const DbLive = Layer.effect(
   return yield* HttpServerResponse.schemaJson(User)(user)
 }))`} />
 
-      <h2>Composing at the Edge</h2>
+      <h2 id="composing-at-the-edge">Composing at the Edge</h2>
       <CodeBlock code={`// All layers merge at one point
 const AppLayer = Layer.mergeAll(
   ConfigLive,
@@ -153,7 +170,7 @@ const MainLayer = pipe(
 // Launch — resources acquired, then released on shutdown
 Layer.launch(MainLayer).pipe(NodeRuntime.runMain)`} />
 
-      <h2>Testing with Mocks</h2>
+      <h2 id="testing-with-mocks">Testing with Mocks</h2>
       <CodeBlock code={`// Create a mock layer
 const UserRepoTest = Layer.succeed(UserRepo, {
   findById: (id) => Effect.succeed({ id, name: "Test User", email: "test@test.com" }),
@@ -172,7 +189,7 @@ await Effect.runPromise(
   testEffect.pipe(Effect.provide(UserRepoTest))
 )`} />
 
-      <h2>Why No Modules?</h2>
+      <h2 id="why-no-modules">Why No Modules?</h2>
       <p>
         A "Module" abstraction would add indirection without benefit. With plain Layers:
       </p>

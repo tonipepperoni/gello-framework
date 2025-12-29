@@ -1,17 +1,35 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { DocsContent, CodeBlock, Callout } from '../../components';
+import { DocsContent, CodeBlock, Callout, type TOCItem } from '../../components';
+import { getPageNavigation } from '../../lib/source';
 
 export const Route = createFileRoute('/docs/cli')({
   component: CliPage,
 });
 
+const toc: TOCItem[] = [
+  { title: 'Installation', url: '#installation', depth: 2 },
+  { title: 'Available Commands', url: '#available-commands', depth: 2 },
+  { title: 'new', url: '#new', depth: 3 },
+  { title: 'serve', url: '#serve', depth: 3 },
+  { title: 'route:list', url: '#route-list', depth: 3 },
+  { title: 'Generators', url: '#generators', depth: 3 },
+  { title: 'Database', url: '#database', depth: 3 },
+  { title: 'Queue', url: '#queue', depth: 3 },
+  { title: 'Help', url: '#help', depth: 2 },
+  { title: 'Route List Output', url: '#route-list-output', depth: 2 },
+];
+
 function CliPage() {
+  const footer = getPageNavigation('/docs/cli');
+
   return (
     <DocsContent
       title="CLI"
       description="Gello CLI — create projects and manage your application"
+      toc={toc}
+      footer={footer}
     >
-      <h2>Installation</h2>
+      <h2 id="installation">Installation</h2>
       <p>
         The Gello CLI is available as an npm package. Use it directly with npx:
       </p>
@@ -25,9 +43,9 @@ function CliPage() {
       <CodeBlock lang="bash" code={`npm install -g gello
 gello <command>`} />
 
-      <h2>Available Commands</h2>
+      <h2 id="available-commands">Available Commands</h2>
 
-      <h3>new</h3>
+      <h3 id="new">new</h3>
       <p>
         Create a new Gello project with a complete starter template:
       </p>
@@ -44,7 +62,7 @@ pnpm dev`} />
         TypeScript configuration, and development scripts with hot reload.
       </Callout>
 
-      <h3>serve</h3>
+      <h3 id="serve">serve</h3>
       <p>
         Start the development server with hot reload:
       </p>
@@ -54,7 +72,7 @@ npx gello serve
 # Or with a custom port
 npx gello serve --port 4000`} />
 
-      <h3>route:list</h3>
+      <h3 id="route-list">route:list</h3>
       <p>
         Display all registered routes in a beautiful TUI:
       </p>
@@ -70,7 +88,7 @@ npx gello route:list --method GET
 # Filter by path
 npx gello route:list --path /users`} />
 
-      <h3>Generators (Coming Soon)</h3>
+      <h3 id="generators">Generators (Coming Soon)</h3>
       <CodeBlock lang="bash" code={`# Generate a controller
 npx gello make:controller User
 
@@ -80,7 +98,7 @@ npx gello make:service Email
 # Generate a job
 npx gello make:job SendWelcomeEmail`} />
 
-      <h3>Database (Coming Soon)</h3>
+      <h3 id="database">Database (Coming Soon)</h3>
       <CodeBlock lang="bash" code={`# Run migrations
 npx gello migrate
 
@@ -90,7 +108,7 @@ npx gello migrate:make add_users_table
 # Rollback last migration
 npx gello migrate:rollback`} />
 
-      <h3>Queue (Coming Soon)</h3>
+      <h3 id="queue">Queue (Coming Soon)</h3>
       <CodeBlock lang="bash" code={`# Start queue worker
 npx gello queue:work
 
@@ -100,14 +118,14 @@ npx gello queue:status
 # Clear failed jobs
 npx gello queue:clear --failed`} />
 
-      <h2>Help</h2>
+      <h2 id="help">Help</h2>
       <CodeBlock lang="bash" code={`# Show help
 npx gello --help
 
 # Show version
 npx gello --version`} />
 
-      <h2>Route List Output</h2>
+      <h2 id="route-list-output">Route List Output</h2>
       <p>
         The <code>route:list</code> command displays a beautiful TUI with:
       </p>

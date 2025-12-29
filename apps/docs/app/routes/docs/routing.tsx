@@ -1,17 +1,33 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { DocsContent, CodeBlock, Callout } from '../../components';
+import { DocsContent, CodeBlock, Callout, type TOCItem } from '../../components';
+import { getPageNavigation } from '../../lib/source';
 
 export const Route = createFileRoute('/docs/routing')({
   component: RoutingPage,
 });
 
+const toc: TOCItem[] = [
+  { title: 'Route Builders', url: '#route-builders', depth: 2 },
+  { title: 'Route Parameters', url: '#route-parameters', depth: 2 },
+  { title: 'Query Parameters', url: '#query-parameters', depth: 2 },
+  { title: 'Registering Routes', url: '#registering-routes', depth: 2 },
+  { title: 'Route Groups', url: '#route-groups', depth: 2 },
+  { title: 'Middleware per Route', url: '#middleware-per-route', depth: 2 },
+  { title: 'Error Handling', url: '#error-handling', depth: 2 },
+  { title: 'CLI: List Routes', url: '#cli-list-routes', depth: 2 },
+];
+
 function RoutingPage() {
+  const footer = getPageNavigation('/docs/routing');
+
   return (
     <DocsContent
       title="Routing"
       description="Declarative route definitions with type-safe params and automatic context injection"
+      toc={toc}
+      footer={footer}
     >
-      <h2>Route Builders</h2>
+      <h2 id="route-builders">Route Builders</h2>
       <p>
         Gello provides a fluent route builder API that creates typed route definitions.
         Routes are just data — arrays of route objects that get registered with your app.
@@ -30,7 +46,7 @@ export const routes = [
   route.delete("/users/:id", deleteUser),
 ] as const`} />
 
-      <h2>Route Parameters</h2>
+      <h2 id="route-parameters">Route Parameters</h2>
       <p>
         Route parameters are automatically extracted and injected into your handler's context.
         Use the <code>getParam</code> helper to access them type-safely.
@@ -52,7 +68,7 @@ const getUser = Effect.gen(function* () {
   return HttpServerResponse.json(user)
 })`} />
 
-      <h2>Query Parameters</h2>
+      <h2 id="query-parameters">Query Parameters</h2>
       <p>
         Query parameters are also available via context. Use typed helpers for common conversions.
       </p>
@@ -75,7 +91,7 @@ const listUsers = Effect.gen(function* () {
   return HttpServerResponse.json(users)
 })`} />
 
-      <h2>Registering Routes</h2>
+      <h2 id="registering-routes">Registering Routes</h2>
       <p>
         Routes are registered with your app using the <code>routes()</code> method.
         The app automatically injects <code>RouteParams</code>, <code>QueryParams</code>,
@@ -91,7 +107,7 @@ const app = createApp({ port: 3000 })
 
 runApp(app, AppLayer)`} />
 
-      <h2>Route Groups</h2>
+      <h2 id="route-groups">Route Groups</h2>
       <p>
         Organize related routes by defining them in separate files and combining them.
       </p>
@@ -116,7 +132,7 @@ export const routes = [
   ...postRoutes,
 ] as const`} />
 
-      <h2>Middleware per Route</h2>
+      <h2 id="middleware-per-route">Middleware per Route</h2>
       <p>
         Apply middleware to specific routes by wrapping handlers.
       </p>
@@ -142,7 +158,7 @@ export const routes = [
   route.post("/settings", withAuth(updateSettings)),
 ] as const`} />
 
-      <h2>Error Handling</h2>
+      <h2 id="error-handling">Error Handling</h2>
       <p>
         Wrap routes with error handlers to convert domain errors to HTTP responses.
       </p>
@@ -168,7 +184,7 @@ export const routes = [
   route.post("/users", handle(createUser)),
 ] as const`} />
 
-      <h2>CLI: List Routes</h2>
+      <h2 id="cli-list-routes">CLI: List Routes</h2>
       <p>
         Use the Gello CLI to view all registered routes in your application.
       </p>

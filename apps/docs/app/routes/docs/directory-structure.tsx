@@ -8,19 +8,31 @@ import {
   Callout,
   Accordions,
   Accordion,
+  type TOCItem,
 } from '../../components';
+import { getPageNavigation } from '../../lib/source';
 
 export const Route = createFileRoute('/docs/directory-structure')({
   component: DirectoryStructurePage,
 });
 
+const toc: TOCItem[] = [
+  { title: 'Standard Layout', url: '#standard-layout', depth: 2 },
+  { title: 'Directory Breakdown', url: '#directory-breakdown', depth: 2 },
+  { title: 'Worker Entry Point', url: '#worker-entry-point', depth: 2 },
+];
+
 function DirectoryStructurePage() {
+  const footer = getPageNavigation('/docs/directory-structure');
+
   return (
     <DocsContent
       title="Directory Structure"
       description="Recommended project layout for Gello applications"
+      toc={toc}
+      footer={footer}
     >
-      <h2>Standard Layout</h2>
+      <h2 id="standard-layout">Standard Layout</h2>
       <Files>
         <Folder name="src" defaultOpen>
           <File name="main.ts" />
@@ -63,7 +75,7 @@ function DirectoryStructurePage() {
         This structure follows the principle: <strong>Layers for dependencies, Services for business logic, Routes for HTTP handlers.</strong>
       </Callout>
 
-      <h2>Directory Breakdown</h2>
+      <h2 id="directory-breakdown">Directory Breakdown</h2>
 
       <Accordions type="single">
         <Accordion id="entry" title="main.ts — Entry Point">
@@ -199,7 +211,7 @@ export const EmailWorker = Layer.effect(
         </Accordion>
       </Accordions>
 
-      <h2>Worker Entry Point</h2>
+      <h2 id="worker-entry-point">Worker Entry Point</h2>
       <p>For background job processing, create a separate worker entry:</p>
       <CodeBlock lang="typescript" code={`// src/worker.ts
 import { pipe } from "effect"

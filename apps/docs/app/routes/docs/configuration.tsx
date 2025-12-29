@@ -1,17 +1,37 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { DocsContent, CodeBlock, Callout } from '../../components';
+import { DocsContent, CodeBlock, Callout, type TOCItem } from '../../components';
+import { getPageNavigation } from '../../lib/source';
 
 export const Route = createFileRoute('/docs/configuration')({
   component: ConfigurationPage,
 });
 
+const toc: TOCItem[] = [
+  { title: 'Overview', url: '#overview', depth: 2 },
+  { title: 'Quick Start', url: '#quick-start', depth: 2 },
+  { title: 'Environment Files', url: '#environment-files', depth: 2 },
+  { title: 'Example .env.example', url: '#example-env-example', depth: 3 },
+  { title: 'The env() Helper', url: '#the-env-helper', depth: 2 },
+  { title: 'Config Service (Effect Pattern)', url: '#config-service-effect-pattern', depth: 2 },
+  { title: 'Schema Validation', url: '#schema-validation', depth: 2 },
+  { title: 'Built-in Validators', url: '#built-in-validators', depth: 2 },
+  { title: 'Environment Detection', url: '#environment-detection', depth: 2 },
+  { title: 'Environment Priority', url: '#environment-priority', depth: 3 },
+  { title: 'Testing Utilities', url: '#testing-utilities', depth: 2 },
+  { title: 'Best Practices', url: '#best-practices', depth: 2 },
+];
+
 function ConfigurationPage() {
+  const footer = getPageNavigation('/docs/configuration');
+
   return (
     <DocsContent
       title="Configuration"
       description="Laravel-inspired configuration with dot notation, environment detection, and type-safe validation"
+      toc={toc}
+      footer={footer}
     >
-      <h2>Overview</h2>
+      <h2 id="overview">Overview</h2>
       <p>
         Gello provides a powerful configuration system via <code>@gello/config</code> that supports:
       </p>
@@ -25,7 +45,7 @@ function ConfigurationPage() {
         <li>Testing utilities for easy overrides</li>
       </ul>
 
-      <h2>Quick Start</h2>
+      <h2 id="quick-start">Quick Start</h2>
       <p>
         Generated projects include a <code>src/config/index.ts</code> file with a pre-configured setup:
       </p>
@@ -63,7 +83,7 @@ export const config = {
   },
 } as const;`} />
 
-      <h2>Environment Files</h2>
+      <h2 id="environment-files">Environment Files</h2>
       <p>
         Gello loads <code>.env</code> files with Laravel-style cascading priority (highest to lowest):
       </p>
@@ -78,7 +98,7 @@ export const config = {
         Never commit <code>.env</code> files with secrets. Use <code>.env.example</code> as a template.
       </Callout>
 
-      <h3>Example .env.example</h3>
+      <h3 id="example-env-example">Example .env.example</h3>
       <CodeBlock lang="bash" code={`# Application
 APP_NAME=my-app
 APP_ENV=local
@@ -110,7 +130,7 @@ QUEUE_DRIVER=memory
 QUEUE_DEFAULT=default
 QUEUE_PREFIX=gello:`} />
 
-      <h2>The env() Helper</h2>
+      <h2 id="the-env-helper">The env() Helper</h2>
       <p>
         The <code>env()</code> function reads from <code>process.env</code> with an optional default:
       </p>
@@ -126,7 +146,7 @@ const apiKey = env('API_KEY');
 const portNum = Number(env('PORT', '3000'));
 const debug = env('DEBUG', 'false') === 'true';`} />
 
-      <h2>Config Service (Effect Pattern)</h2>
+      <h2 id="config-service-effect-pattern">Config Service (Effect Pattern)</h2>
       <p>
         For Effect-based applications, use the Config service with dependency injection:
       </p>
@@ -161,7 +181,7 @@ Effect.runPromise(
   Effect.provide(program, configLayer)
 );`} />
 
-      <h2>Schema Validation</h2>
+      <h2 id="schema-validation">Schema Validation</h2>
       <p>
         Validate config values against Effect Schema for runtime type safety:
       </p>
@@ -180,7 +200,7 @@ import { Schema } from '@effect/schema';
 const LogLevel = Schema.Literal('debug', 'info', 'warn', 'error');
 const level = yield* schema('log.level', LogLevel);`} />
 
-      <h2>Built-in Validators</h2>
+      <h2 id="built-in-validators">Built-in Validators</h2>
       <CodeBlock code={`import {
   // String validators
   NonEmptyString,        // String with length >= 1
@@ -210,7 +230,7 @@ const level = yield* schema('log.level', LogLevel);`} />
   PortFromString,        // "3000" → 3000 (validated)
 } from '@gello/config';`} />
 
-      <h2>Environment Detection</h2>
+      <h2 id="environment-detection">Environment Detection</h2>
       <p>
         Detect and respond to the current environment:
       </p>
@@ -246,7 +266,7 @@ yield* whenEnvironment(['staging', 'production'],
   Effect.sync(() => enableMetrics())
 );`} />
 
-      <h3>Environment Priority</h3>
+      <h3 id="environment-priority">Environment Priority</h3>
       <p>
         Environment is detected from these variables in order:
       </p>
@@ -259,7 +279,7 @@ yield* whenEnvironment(['staging', 'production'],
         Aliases are supported: <code>dev</code> → development, <code>prod</code> → production, <code>test</code> → testing
       </p>
 
-      <h2>Testing Utilities</h2>
+      <h2 id="testing-utilities">Testing Utilities</h2>
       <p>
         Override config easily in tests:
       </p>
@@ -284,7 +304,7 @@ const result = await Effect.runPromise(
   )
 );`} />
 
-      <h2>Best Practices</h2>
+      <h2 id="best-practices">Best Practices</h2>
       <ul>
         <li><strong>Never commit <code>.env</code></strong> — Use <code>.env.example</code> as a template</li>
         <li><strong>Use defaults for development</strong> — Make the app run with zero config locally</li>

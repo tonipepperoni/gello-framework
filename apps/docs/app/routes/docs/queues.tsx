@@ -1,17 +1,33 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { DocsContent, CodeBlock, Callout } from '../../components';
+import { DocsContent, CodeBlock, Callout, type TOCItem } from '../../components';
+import { getPageNavigation } from '../../lib/source';
 
 export const Route = createFileRoute('/docs/queues')({
   component: QueuesPage,
 });
 
+const toc: TOCItem[] = [
+  { title: 'The Pattern', url: '#the-pattern', depth: 2 },
+  { title: 'Queue Service Layer', url: '#queue-service-layer', depth: 2 },
+  { title: 'Redis-Backed Queue', url: '#redis-backed-queue', depth: 2 },
+  { title: 'Dispatching Jobs', url: '#dispatching-jobs', depth: 2 },
+  { title: 'Worker Process', url: '#worker-process', depth: 2 },
+  { title: 'Typed Job Definitions', url: '#typed-job-definitions', depth: 2 },
+  { title: 'Parallel Workers', url: '#parallel-workers', depth: 2 },
+  { title: 'Testing', url: '#testing', depth: 2 },
+];
+
 function QueuesPage() {
+  const footer = getPageNavigation('/docs/queues');
+
   return (
     <DocsContent
       title="Queues"
       description="Laravel-inspired job queues — implemented with pure Effect primitives"
+      toc={toc}
+      footer={footer}
     >
-      <h2>The Pattern</h2>
+      <h2 id="the-pattern">The Pattern</h2>
       <p>
         Gello's queue system takes inspiration from Laravel's elegant job dispatching API,
         but implements it using Effect's functional patterns. Jobs are values, workers are Layers,
@@ -23,7 +39,7 @@ function QueuesPage() {
         lifecycle management — no external queue dependency required.
       </Callout>
 
-      <h2>Queue Service Layer</h2>
+      <h2 id="queue-service-layer">Queue Service Layer</h2>
       <CodeBlock code={`import { Context, Effect, Layer, Queue, Fiber } from "effect"
 
 // 1) Define the service interface
@@ -60,7 +76,7 @@ const EmailQueueLive = Layer.scoped(
   })
 )`} />
 
-      <h2>Redis-Backed Queue</h2>
+      <h2 id="redis-backed-queue">Redis-Backed Queue</h2>
       <CodeBlock code={`import { Context, Effect, Layer, Stream, Schedule } from "effect"
 
 // Redis-backed queue with persistence
@@ -103,7 +119,7 @@ const EmailQueueRedis = Layer.scoped(
   })
 ).pipe(Layer.provide(RedisLive))`} />
 
-      <h2>Dispatching Jobs</h2>
+      <h2 id="dispatching-jobs">Dispatching Jobs</h2>
       <CodeBlock code={`HttpRouter.post("/users", Effect.gen(function* () {
   const body = yield* HttpServerRequest.schemaBodyJson(CreateUser)
   const repo = yield* UserRepo
@@ -121,7 +137,7 @@ const EmailQueueRedis = Layer.scoped(
   return yield* HttpServerResponse.schemaJson(User)(user)
 }))`} />
 
-      <h2>Worker Process</h2>
+      <h2 id="worker-process">Worker Process</h2>
       <CodeBlock code={`// src/worker.ts
 import { pipe } from "effect"
 import * as Effect from "effect/Effect"
@@ -157,7 +173,7 @@ Layer.launch(MainLayer).pipe(NodeRuntime.runMain)`} />
 
       <CodeBlock lang="bash" code={`npx tsx src/worker.ts`} />
 
-      <h2>Typed Job Definitions</h2>
+      <h2 id="typed-job-definitions">Typed Job Definitions</h2>
       <CodeBlock code={`import * as S from "@effect/schema/Schema"
 
 // Define job schemas
@@ -184,7 +200,7 @@ const Job = S.Union(
 
 type Job = S.Schema.Type<typeof Job>`} />
 
-      <h2>Parallel Workers</h2>
+      <h2 id="parallel-workers">Parallel Workers</h2>
       <CodeBlock code={`// Run N workers in parallel
 const parallelWorkers = (n: number) =>
   Layer.scopedDiscard(
@@ -209,7 +225,7 @@ const parallelWorkers = (n: number) =>
     })
   )`} />
 
-      <h2>Testing</h2>
+      <h2 id="testing">Testing</h2>
       <CodeBlock code={`// In-memory test queue that tracks jobs
 const createTestQueue = <T>() => {
   const jobs: T[] = []

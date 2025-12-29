@@ -8,27 +8,50 @@ import {
   Step,
   Cards,
   Card,
+  type TOCItem,
 } from '../../components';
+import { getPageNavigation } from '../../lib/source';
 
 export const Route = createFileRoute('/docs/http')({
   component: HttpPage,
 });
 
+const toc: TOCItem[] = [
+  { title: 'Setup', url: '#setup', depth: 2 },
+  { title: 'Core Concepts', url: '#core-concepts', depth: 2 },
+  { title: 'Basic Router', url: '#basic-router', depth: 2 },
+  { title: 'Request Handling', url: '#request-handling', depth: 2 },
+  { title: 'Path Parameters', url: '#path-parameters', depth: 3 },
+  { title: 'Query Parameters', url: '#query-parameters', depth: 3 },
+  { title: 'Request Body', url: '#request-body', depth: 3 },
+  { title: 'Response Building', url: '#response-building', depth: 2 },
+  { title: 'Middleware', url: '#middleware', depth: 2 },
+  { title: 'Booting the Server', url: '#booting-the-server', depth: 2 },
+  { title: 'Create the HTTP app from router', url: '#create-the-http-app-from-router', depth: 3 },
+  { title: 'Create the server layer', url: '#create-the-server-layer', depth: 3 },
+  { title: 'Compose with app layers and launch', url: '#compose-with-app-layers-and-launch', depth: 3 },
+  { title: 'Error Handling', url: '#error-handling', depth: 2 },
+];
+
 function HttpPage() {
+  const footer = getPageNavigation('/docs/http');
+
   return (
     <DocsContent
       title="HTTP Server"
       description="Functional HTTP layer with @effect/platform — type-safe, composable, resource-managed"
+      toc={toc}
+      footer={footer}
     >
       <Callout type="info">
         Unlike Express or Koa, Gello's HTTP layer is built on Effect's functional patterns.
         Routes are values, handlers return Effects, and resources are automatically managed.
       </Callout>
 
-      <h2>Setup</h2>
+      <h2 id="setup">Setup</h2>
       <CodeBlock lang="bash" code={`pnpm add effect @effect/schema @effect/platform @effect/platform-node`} />
 
-      <h2>Core Concepts</h2>
+      <h2 id="core-concepts">Core Concepts</h2>
       <Cards>
         <Card title="HttpRouter" description="Compose routes as values with type-safe parameters" />
         <Card title="HttpServerRequest" description="Access request body, headers, and query params" />
@@ -36,7 +59,7 @@ function HttpPage() {
         <Card title="HttpMiddleware" description="Compose middleware as Effects" />
       </Cards>
 
-      <h2>Basic Router</h2>
+      <h2 id="basic-router">Basic Router</h2>
       <CodeBlock lang="typescript" code={`import { pipe } from "effect"
 import * as HttpRouter from "@effect/platform/HttpRouter"
 import * as HttpServerResponse from "@effect/platform/HttpServerResponse"
@@ -56,9 +79,9 @@ const AppRouter = pipe(
   }))
 )`} />
 
-      <h2>Request Handling</h2>
+      <h2 id="request-handling">Request Handling</h2>
 
-      <h3>Path Parameters</h3>
+      <h3 id="path-parameters">Path Parameters</h3>
       <TypeTable
         type={{
           'HttpRouter.schemaPathParams': {
@@ -74,7 +97,7 @@ const AppRouter = pipe(
   // id is typed as string
 }))`} />
 
-      <h3>Query Parameters</h3>
+      <h3 id="query-parameters">Query Parameters</h3>
       <TypeTable
         type={{
           'HttpRouter.schemaSearchParams': {
@@ -93,7 +116,7 @@ HttpRouter.get("/users", Effect.gen(function* () {
   // page and limit are typed as numbers with defaults
 }))`} />
 
-      <h3>Request Body</h3>
+      <h3 id="request-body">Request Body</h3>
       <TypeTable
         type={{
           'HttpServerRequest.schemaBodyJson': {
@@ -120,7 +143,7 @@ HttpRouter.post("/users", Effect.gen(function* () {
   return yield* HttpServerResponse.schemaJson(User)(user)
 }))`} />
 
-      <h2>Response Building</h2>
+      <h2 id="response-building">Response Building</h2>
       <TypeTable
         type={{
           'HttpServerResponse.json': {
@@ -163,7 +186,7 @@ HttpRouter.get("/users/:id", Effect.gen(function* () {
   return yield* HttpServerResponse.schemaJson(UserResponse)(user)
 }))`} />
 
-      <h2>Middleware</h2>
+      <h2 id="middleware">Middleware</h2>
       <CodeBlock lang="typescript" code={`import * as HttpMiddleware from "@effect/platform/HttpMiddleware"
 
 // Logging middleware (built-in)
@@ -196,14 +219,14 @@ const ProtectedRouter = pipe(
   }))
 ).pipe(withAuth)`} />
 
-      <h2>Booting the Server</h2>
+      <h2 id="booting-the-server">Booting the Server</h2>
       <Steps>
         <Step>
-          <h3>Create the HTTP app from router</h3>
+          <h3 id="create-the-http-app-from-router">Create the HTTP app from router</h3>
           <CodeBlock lang="typescript" code={`const HttpApp = HttpRouter.toHttpApp(AppRouter)`} />
         </Step>
         <Step>
-          <h3>Create the server layer</h3>
+          <h3 id="create-the-server-layer">Create the server layer</h3>
           <CodeBlock lang="typescript" code={`import * as HttpServer from "@effect/platform/HttpServer"
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer"
 import { createServer } from "node:http"
@@ -215,7 +238,7 @@ const ServerLayer = pipe(
 )`} />
         </Step>
         <Step>
-          <h3>Compose with app layers and launch</h3>
+          <h3 id="compose-with-app-layers-and-launch">Compose with app layers and launch</h3>
           <CodeBlock lang="typescript" code={`import * as NodeRuntime from "@effect/platform-node/NodeRuntime"
 
 const MainLayer = pipe(
@@ -227,7 +250,7 @@ Layer.launch(MainLayer).pipe(NodeRuntime.runMain)`} />
         </Step>
       </Steps>
 
-      <h2>Error Handling</h2>
+      <h2 id="error-handling">Error Handling</h2>
       <CodeBlock lang="typescript" code={`// Errors become proper HTTP responses
 class NotFoundError extends Data.TaggedError("NotFoundError")<{
   resource: string

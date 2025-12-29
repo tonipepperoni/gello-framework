@@ -1,15 +1,30 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { DocsContent, CodeBlock, Callout, Mermaid } from '../../components';
+import { DocsContent, CodeBlock, Callout, Mermaid, type TOCItem } from '../../components';
+import { getPageNavigation } from '../../lib/source';
 
 export const Route = createFileRoute('/docs/')({
   component: DocsIntroduction,
 });
 
+const toc: TOCItem[] = [
+  { title: 'Architecture Overview', url: '#architecture-overview', depth: 2 },
+  { title: 'Core Philosophy', url: '#core-philosophy', depth: 2 },
+  { title: 'Quick Example', url: '#quick-example', depth: 2 },
+  { title: 'What This Gives You', url: '#what-this-gives-you', depth: 2 },
+  { title: 'Quick Start', url: '#quick-start', depth: 2 },
+  { title: 'Packages', url: '#packages', depth: 2 },
+  { title: 'Requirements', url: '#requirements', depth: 2 },
+];
+
 function DocsIntroduction() {
+  const footer = getPageNavigation('/docs');
+
   return (
     <DocsContent
       title="Introduction"
       description="Gello — A TypeScript backend framework built on Effect, inspired by Laravel, Rails, and NestJS"
+      toc={toc}
+      footer={footer}
     >
       <p>
         Gello is a sophisticated backend framework that combines the best ideas from established frameworks
@@ -29,7 +44,7 @@ function DocsIntroduction() {
         Gello follows the principle: <strong>program = value, interpret at the edge</strong>.
       </p>
 
-      <h2>Architecture Overview</h2>
+      <h2 id="architecture-overview">Architecture Overview</h2>
       <Mermaid chart={`
 flowchart TB
     subgraph Edge["Edge (Runtime)"]
@@ -75,7 +90,7 @@ flowchart TB
     style Infra fill:#fff3e0
 `} />
 
-      <h2>Core Philosophy</h2>
+      <h2 id="core-philosophy">Core Philosophy</h2>
 
       <Callout type="info" title="The Gello Way">
         Build applications as pure values, compose them with Layers, and interpret at the edge.
@@ -89,7 +104,7 @@ flowchart TB
         <li><strong>Single Composition Point</strong>: All layers merge at one root, then <code>Layer.launch</code></li>
       </ul>
 
-      <h2>Quick Example</h2>
+      <h2 id="quick-example">Quick Example</h2>
       <CodeBlock lang="typescript" code={`import { Context, Effect, Layer, pipe } from "effect"
 import * as S from "@effect/schema/Schema"
 import * as HttpRouter from "@effect/platform/HttpRouter"
@@ -137,7 +152,7 @@ const MainLayer = pipe(
 
 Layer.launch(MainLayer).pipe(NodeRuntime.runMain)`} />
 
-      <h2>What This Gives You</h2>
+      <h2 id="what-this-gives-you">What This Gives You</h2>
       <ul>
         <li><strong>Resource Safety</strong>: Pools close on shutdown, connections release properly</li>
         <li><strong>Testability</strong>: Swap any Layer for a mock — no DI container ceremony</li>
@@ -145,13 +160,13 @@ Layer.launch(MainLayer).pipe(NodeRuntime.runMain)`} />
         <li><strong>No Magic</strong>: It's just functions and values, all the way down</li>
       </ul>
 
-      <h2>Quick Start</h2>
+      <h2 id="quick-start">Quick Start</h2>
       <CodeBlock lang="bash" code={`npx gello new my-app
 cd my-app
 pnpm install
 pnpm dev`} />
 
-      <h2>Packages</h2>
+      <h2 id="packages">Packages</h2>
       <p>Gello is organized into focused packages:</p>
       <ul>
         <li><code>@gello/core</code> — Core contracts, errors, and base types</li>
@@ -162,7 +177,7 @@ pnpm dev`} />
         <li><code>@gello/testing</code> — Testing utilities and mocks</li>
       </ul>
 
-      <h2>Requirements</h2>
+      <h2 id="requirements">Requirements</h2>
       <ul>
         <li><strong>Node.js</strong> 20.0+</li>
         <li><strong>TypeScript</strong> 5.4+</li>

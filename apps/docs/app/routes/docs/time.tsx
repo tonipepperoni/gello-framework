@@ -1,24 +1,45 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { DocsContent, CodeBlock, Callout } from '../../components';
+import { DocsContent, CodeBlock, Callout, type TOCItem } from '../../components';
+import { getPageNavigation } from '../../lib/source';
 
 export const Route = createFileRoute('/docs/time')({
   component: TimePage,
 });
 
+const toc: TOCItem[] = [
+  { title: 'Overview', url: '#overview', depth: 2 },
+  { title: 'Installation', url: '#installation', depth: 2 },
+  { title: 'Duration', url: '#duration', depth: 2 },
+  { title: 'Creating Durations', url: '#creating-durations', depth: 3 },
+  { title: 'Special Values', url: '#special-values', depth: 3 },
+  { title: 'Converting Durations', url: '#converting-durations', depth: 3 },
+  { title: 'Common Presets', url: '#common-presets', depth: 3 },
+  { title: 'DateTime (Effect-based)', url: '#datetime-effect-based', depth: 2 },
+  { title: 'Current Time', url: '#current-time', depth: 3 },
+  { title: 'Expiration Calculation', url: '#expiration-calculation', depth: 3 },
+  { title: 'Testing with TestClock', url: '#testing-with-testclock', depth: 2 },
+  { title: 'Usage in Gello', url: '#usage-in-gello', depth: 2 },
+  { title: 'API Reference', url: '#api-reference', depth: 2 },
+];
+
 function TimePage() {
+  const footer = getPageNavigation('/docs/time');
+
   return (
     <DocsContent
       title="Time Utilities"
       description="Type-safe duration and datetime utilities built on Effect — testable time operations for cache TTLs, queue delays, and scheduling"
+      toc={toc}
+      footer={footer}
     >
-      <h2>Overview</h2>
+      <h2 id="overview">Overview</h2>
       <p>
         The <code>@gello/time</code> library provides time utilities used throughout Gello. It wraps
         Effect's Duration and DateTime modules with convenient factories and expiration helpers.
         All time-dependent operations are Effects, making them testable with Effect's TestClock.
       </p>
 
-      <h2>Installation</h2>
+      <h2 id="installation">Installation</h2>
       <CodeBlock code={`import {
   // Duration factories
   seconds, minutes, hours, days, weeks,
@@ -32,12 +53,12 @@ function TimePage() {
   Durations,
 } from "@gello/time"`} />
 
-      <h2>Duration</h2>
+      <h2 id="duration">Duration</h2>
       <p>
         Durations represent time spans. Create them with factory functions that wrap Effect's Duration:
       </p>
 
-      <h3>Creating Durations</h3>
+      <h3 id="creating-durations">Creating Durations</h3>
       <CodeBlock code={`import { seconds, minutes, hours, days, weeks, millis } from "@gello/time"
 
 // Basic factories
@@ -52,7 +73,7 @@ const fiveHundredMs = millis(500)
 import { Duration } from "effect"
 const combined = Duration.sum(minutes(5), seconds(30)) // 5:30`} />
 
-      <h3>Special Values</h3>
+      <h3 id="special-values">Special Values</h3>
       <CodeBlock code={`import { forever, zero, isForever, isFinite } from "@gello/time"
 
 // Forever = infinite duration (no expiration)
@@ -65,7 +86,7 @@ const immediate = zero
 isForever(immediate) // false
 isFinite(immediate)  // true`} />
 
-      <h3>Converting Durations</h3>
+      <h3 id="converting-durations">Converting Durations</h3>
       <CodeBlock code={`import { toMillis, toSeconds, toMinutes, toHours, forever } from "@gello/time"
 
 const duration = minutes(5)
@@ -78,7 +99,7 @@ toHours(duration)    // 0.0833...
 // Returns null for infinite durations
 toMillis(forever)    // null`} />
 
-      <h3>Common Presets</h3>
+      <h3 id="common-presets">Common Presets</h3>
       <CodeBlock code={`import { Durations, toMillis } from "@gello/time"
 
 Durations.hundredMillis   // 100ms
@@ -102,13 +123,13 @@ Durations.zero            // 0
 // Example usage
 cache.put("session", data, Durations.thirtyMinutes)`} />
 
-      <h2>DateTime (Effect-based)</h2>
+      <h2 id="datetime-effect-based">DateTime (Effect-based)</h2>
       <p>
         DateTime operations are Effects, making them testable with TestClock. Use these for
         cache expiration, scheduling, and any time-sensitive logic.
       </p>
 
-      <h3>Current Time</h3>
+      <h3 id="current-time">Current Time</h3>
       <CodeBlock code={`import { now, unsafeNow } from "@gello/time"
 import { Effect } from "effect"
 
@@ -121,7 +142,7 @@ const program = Effect.gen(function* () {
 // Synchronous (not testable, use sparingly)
 const instant = unsafeNow()  // DateTime.Utc`} />
 
-      <h3>Expiration Calculation</h3>
+      <h3 id="expiration-calculation">Expiration Calculation</h3>
       <CodeBlock code={`import { expiresAt, isExpired, remainingTtl } from "@gello/time"
 import { minutes, forever } from "@gello/time"
 import { Effect, Option } from "effect"
@@ -146,7 +167,7 @@ const program = Effect.gen(function* () {
   Option.isNone(noExpiry)  // true
 })`} />
 
-      <h2>Testing with TestClock</h2>
+      <h2 id="testing-with-testclock">Testing with TestClock</h2>
       <Callout type="info">
         Because time operations are Effects, you can use Effect's TestClock to control time in tests.
       </Callout>
@@ -176,9 +197,9 @@ const testExpiration = Effect.gen(function* () {
 
 await Effect.runPromise(testExpiration)`} />
 
-      <h2>Usage in Gello</h2>
+      <h2 id="usage-in-gello">Usage in Gello</h2>
 
-      <h3>Cache TTLs</h3>
+      <h3 id="cache-ttls">Cache TTLs</h3>
       <CodeBlock code={`import { Cache } from "@gello/cache"
 import { minutes, hours, Durations, forever } from "@gello/time"
 
@@ -194,7 +215,7 @@ Effect.gen(function* () {
   yield* cache.put("static", content, forever)
 })`} />
 
-      <h3>Queue Delays</h3>
+      <h3 id="queue-delays">Queue Delays</h3>
       <CodeBlock code={`import { Queue } from "@gello/queue"
 import { seconds, minutes, scheduleIn } from "@gello/time"
 import { Effect } from "effect"
@@ -210,7 +231,7 @@ Effect.gen(function* () {
   yield* queue.push("reports", job, { runAt })
 })`} />
 
-      <h3>Middleware Timeouts</h3>
+      <h3 id="middleware-timeouts">Middleware Timeouts</h3>
       <CodeBlock code={`import { seconds } from "@gello/time"
 import { Effect } from "effect"
 
@@ -223,9 +244,9 @@ const handler = myHandler.pipe(
   withTimeout(seconds(30))
 )`} />
 
-      <h2>API Reference</h2>
+      <h2 id="api-reference">API Reference</h2>
 
-      <h3>Duration Factories</h3>
+      <h3 id="duration-factories">Duration Factories</h3>
       <table>
         <thead>
           <tr>
@@ -245,7 +266,7 @@ const handler = myHandler.pipe(
         </tbody>
       </table>
 
-      <h3>DateTime Operations</h3>
+      <h3 id="datetime-operations">DateTime Operations</h3>
       <table>
         <thead>
           <tr>

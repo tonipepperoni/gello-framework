@@ -12,6 +12,7 @@ interface StepIndicatorProps {
 
 const STEPS: { key: WizardStep; label: string }[] = [
   { key: 'project-type', label: 'Type' },
+  { key: 'template', label: 'Template' },
   { key: 'infrastructure', label: 'Infrastructure' },
   { key: 'features', label: 'Features' },
   { key: 'package-manager', label: 'Package Manager' },

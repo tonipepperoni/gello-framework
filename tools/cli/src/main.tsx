@@ -12,38 +12,31 @@
  */
 import * as React from 'react';
 import { render, Box, Text } from 'ink';
+import { readFileSync } from 'fs';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 import { routeListCommand } from './commands/route-list.js';
 import { newCommand } from './commands/new/index.js';
 import { serveCommand } from './commands/serve.js';
+import { gruvbox, GELLO_LOGO } from './components/wizard/theme.js';
 import { storageCommand, storageConfigCommand } from './commands/storage.js';
 import { generateOpenApiCommand, generateClientCommand } from './commands/openapi/index.js';
 
-// Gruvbox dark palette
-const gruvbox = {
-  bg: '#282828',
-  fg: '#ebdbb2',
-  gray: '#928374',
-  red: '#fb4934',
-  green: '#b8bb26',
-  yellow: '#fabd2f',
-  blue: '#83a598',
-  purple: '#d3869b',
-  aqua: '#8ec07c',
-  orange: '#fe8019',
-  bg1: '#3c3836',
-  bg2: '#504945',
-  fg4: '#a89984',
-};
+// Get version from package.json at runtime
+const __dirname = dirname(fileURLToPath(import.meta.url));
+let VERSION = '0.0.0';
+try {
+  const pkgPath = join(__dirname, 'package.json');
+  VERSION = JSON.parse(readFileSync(pkgPath, 'utf-8')).version;
+} catch {
+  try {
+    const pkgPath = join(__dirname, '..', 'package.json');
+    VERSION = JSON.parse(readFileSync(pkgPath, 'utf-8')).version;
+  } catch {
+    // Version not found
+  }
+}
 
-// Solid block-style logo
-const GELLO_LOGO = `
- ██████╗ ███████╗██╗     ██╗      ██████╗
-██╔════╝ ██╔════╝██║     ██║     ██╔═══██╗
-██║  ███╗█████╗  ██║     ██║     ██║   ██║
-██║   ██║██╔══╝  ██║     ██║     ██║   ██║
-╚██████╔╝███████╗███████╗███████╗╚██████╔╝
- ╚═════╝ ╚══════╝╚══════╝╚══════╝ ╚═════╝
-`.trim();
 
 interface HelpScreenProps {
   version: string;
@@ -284,13 +277,13 @@ const main = async () => {
 
   // Version flag
   if (options['v'] || options['version']) {
-    console.log('0.1.0');
+    console.log(VERSION);
     return;
   }
 
   // Help or no command
   if (!command || options['h'] || options['help']) {
-    const { waitUntilExit } = render(<HelpScreen version="0.1.0" />);
+    const { waitUntilExit } = render(<HelpScreen version={VERSION} />);
     await waitUntilExit();
     return;
   }
@@ -301,12 +294,13 @@ const main = async () => {
       const projectName = args[1];
       if (!projectName) {
         console.error('Error: Project name is required');
-        console.log('Usage: gello new <project-name> [--template todo]');
+        console.log('Usage: gello new <project-name> [--template todo] [-y]');
         process.exit(1);
       }
       await newCommand({
         name: projectName,
         template: options['template'] as string,
+        yes: (options['y'] || options['yes']) as boolean,
       });
       break;
     }

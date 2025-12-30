@@ -2,6 +2,8 @@
  * Wizard Types for gello new command
  */
 
+export type StarterTemplate = 'empty' | 'todo';
+
 export type ProjectType =
   | 'api-only'
   | 'api-spa-tanstack'
@@ -29,6 +31,7 @@ export type PackageManager = 'pnpm' | 'npm' | 'yarn' | 'bun';
 
 export type WizardStep =
   | 'project-type'
+  | 'template'
   | 'infrastructure'
   | 'features'
   | 'package-manager'
@@ -40,6 +43,7 @@ export interface WizardState {
   step: WizardStep;
   projectName: string;
   projectType: ProjectType;
+  template: StarterTemplate;
   infrastructure: InfrastructureConfig;
   features: FeatureFlags;
   packageManager: PackageManager;
@@ -47,6 +51,19 @@ export interface WizardState {
   currentTask: string;
   error?: string;
 }
+
+export const TEMPLATE_OPTIONS = [
+  {
+    label: 'Empty Project',
+    value: 'empty' as StarterTemplate,
+    description: 'Minimal starter with basic setup',
+  },
+  {
+    label: 'TODO Application',
+    value: 'todo' as StarterTemplate,
+    description: 'Full CRUD example with todos (auth-guarded if auth enabled)',
+  },
+] as const;
 
 export const PROJECT_TYPE_OPTIONS = [
   {
@@ -150,6 +167,7 @@ export const getDefaultState = (projectName: string): WizardState => ({
   step: 'project-type',
   projectName,
   projectType: 'api-spa-tanstack',
+  template: 'empty',
   infrastructure: {
     queue: 'sync',
     cache: 'memory',

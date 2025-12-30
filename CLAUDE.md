@@ -162,3 +162,66 @@ Built with Ink (React for CLI). Commands:
 - Use `yield*` to extract values from Effects
 - Errors are typed and handled explicitly
 - Resources managed with `Layer.scoped` and `acquireRelease`
+
+## CLI Templates (CRITICAL)
+
+### Template Rules
+
+**IMPORTANT: CLI templates MUST use published @gello/* packages, NOT self-contained/inline implementations.**
+
+Templates in `tools/cli/src/templates/` generate projects that users install via npm. These generated projects MUST depend on published Gello packages:
+
+```typescript
+// ✅ CORRECT - Use published packages
+const dependencies = [
+  '@gello/platform-node',
+  '@gello/core',
+  '@gello/common',
+  '@gello/auth',  // When auth is enabled
+];
+
+// ❌ WRONG - Never generate auth/core code inline
+// Never make templates "self-contained" without Gello dependencies
+```
+
+### Publishing Checklist
+
+Before publishing CLI updates:
+
+1. **Verify all dependencies are published to npm** - Run `npm view @gello/<package>` for each dependency used in templates
+2. **Check for workspace:* references** - Publishable packages in `libs/publishable/` MUST NOT have `workspace:*` in dependencies when published
+3. **Test the full flow**:
+   ```bash
+   # Create a test project
+   npx gello@latest new testproject --template todo
+   cd testproject
+   pnpm install  # Must succeed without errors
+   pnpm dev      # Must start successfully
+   ```
+
+### Package Publishing Requirements
+
+Publishable packages (`libs/publishable/*`) must:
+
+1. **Bundle all internal dependencies** - The build should resolve all `@gello/internal-*` imports
+2. **NOT have workspace:* in published package.json** - These only work in monorepos
+3. **Use peerDependencies for effect/platform** - Users install these themselves
+
+Example of correct publishable package.json:
+```json
+{
+  "name": "@gello/common",
+  "peerDependencies": {
+    "effect": "^3.19.0",
+    "@gello/core": "^0.1.0"
+  }
+  // NO "dependencies" with workspace:* references
+}
+```
+
+### Common Mistakes to Avoid
+
+1. **Making templates self-contained** - Templates should ALWAYS use Gello packages
+2. **Publishing with workspace:* references** - This breaks npm installs
+3. **Not testing the full install flow** - Always test `pnpm install` in a fresh generated project
+4. **Using internal package names in templates** - Use `@gello/auth` not `@gello/auth-core`

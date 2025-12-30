@@ -1,6 +1,6 @@
 {
   "name": "gello",
-  "version": "0.1.2",
+  "version": "0.1.17",
   "description": "CLI for the Gello TypeScript backend framework",
   "keywords": [
     "cli",

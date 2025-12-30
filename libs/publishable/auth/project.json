@@ -13,25 +13,13 @@
         "postTargets": ["gello-auth:publish"]
       }
     },
-    "build": {
-      "executor": "@nx/esbuild:esbuild",
-      "outputs": ["{options.outputPath}"],
-      "options": {
-        "outputPath": "dist/libs/publishable/auth",
-        "main": "libs/publishable/auth/src/index.ts",
-        "tsConfig": "libs/publishable/auth/tsconfig.lib.json",
-        "assets": [],
-        "format": ["cjs"],
-        "generatePackageJson": true
-      }
-    },
     "publish": {
       "executor": "nx:run-commands",
+      "dependsOn": ["build"],
       "options": {
         "command": "npm publish --access public",
-        "cwd": "dist/libs/publishable/auth"
-      },
-      "dependsOn": ["build"]
+        "cwd": "libs/publishable/auth"
+      }
     }
   }
 }

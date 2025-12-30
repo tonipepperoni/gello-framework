@@ -11,10 +11,12 @@ import {
   GELLO_LOGO,
   type WizardState,
   type ProjectType,
+  type StarterTemplate,
   type InfrastructureConfig,
   type FeatureFlags,
   type PackageManager,
   PROJECT_TYPE_OPTIONS,
+  TEMPLATE_OPTIONS,
   FEATURE_OPTIONS,
   PACKAGE_MANAGER_OPTIONS,
   getDefaultState,
@@ -38,6 +40,15 @@ export const Wizard: React.FC<WizardProps> = ({ projectName }) => {
     setState((prev) => ({
       ...prev,
       projectType: item.value as ProjectType,
+      step: 'template',
+    }));
+  }, []);
+
+  // Template selection handler
+  const handleTemplateSelect = useCallback((item: { value: string }) => {
+    setState((prev) => ({
+      ...prev,
+      template: item.value as StarterTemplate,
       step: 'infrastructure',
     }));
   }, []);
@@ -112,6 +123,7 @@ export const Wizard: React.FC<WizardProps> = ({ projectName }) => {
         await createProject({
           projectName: state.projectName,
           projectType: state.projectType,
+          template: state.template,
           infrastructure: state.infrastructure,
           features: state.features,
           packageManager: state.packageManager,
@@ -167,7 +179,25 @@ export const Wizard: React.FC<WizardProps> = ({ projectName }) => {
           </Box>
         )}
 
-        {/* Step 2: Infrastructure */}
+        {/* Step 2: Template */}
+        {state.step === 'template' && (
+          <Box flexDirection="column">
+            <Box marginBottom={1}>
+              <Text bold color={gruvbox.yellow}>
+                Choose a starter template:
+              </Text>
+            </Box>
+            <SelectInput
+              items={TEMPLATE_OPTIONS.map((opt) => ({
+                label: `${opt.label} - ${opt.description}`,
+                value: opt.value,
+              }))}
+              onSelect={handleTemplateSelect}
+            />
+          </Box>
+        )}
+
+        {/* Step 3: Infrastructure */}
         {state.step === 'infrastructure' && (
           <Box flexDirection="column">
             <Box marginBottom={1}>

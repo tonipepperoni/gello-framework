@@ -4,6 +4,7 @@
  */
 import * as React from 'react';
 import { Box, Text } from 'ink';
+import { gruvbox, GELLO_LOGO } from './wizard/theme.js';
 
 export interface RouteInfo {
   method: string;
@@ -17,43 +18,16 @@ export interface RouteListProps {
   appName?: string;
 }
 
-// Gruvbox dark palette
-const gruvbox = {
-  bg: '#282828',
-  fg: '#ebdbb2',
-  gray: '#928374',
-  red: '#fb4934',
-  green: '#b8bb26',
-  yellow: '#fabd2f',
-  blue: '#83a598',
-  purple: '#d3869b',
-  aqua: '#8ec07c',
-  orange: '#fe8019',
-  bg1: '#3c3836',
-  bg2: '#504945',
-  fg4: '#a89984',
-};
-
-// Method colors using gruvbox palette
+// Method colors using neutral theme
 const methodColors: Record<string, string> = {
-  GET: gruvbox.green,
-  POST: gruvbox.yellow,
-  PUT: gruvbox.blue,
+  GET: gruvbox.success,
+  POST: gruvbox.warning,
+  PUT: gruvbox.primary,
   PATCH: gruvbox.purple,
-  DELETE: gruvbox.red,
-  HEAD: gruvbox.aqua,
+  DELETE: gruvbox.error,
+  HEAD: gruvbox.info,
   OPTIONS: gruvbox.gray,
 };
-
-// Solid block-style logo
-const GELLO_LOGO = `
- ██████╗ ███████╗██╗     ██╗      ██████╗
-██╔════╝ ██╔════╝██║     ██║     ██╔═══██╗
-██║  ███╗█████╗  ██║     ██║     ██║   ██║
-██║   ██║██╔══╝  ██║     ██║     ██║   ██║
-╚██████╔╝███████╗███████╗███████╗╚██████╔╝
- ╚═════╝ ╚══════╝╚══════╝╚══════╝ ╚═════╝
-`.trim();
 
 const MethodBadge: React.FC<{ method: string }> = ({ method }) => {
   const color = methodColors[method] || gruvbox.fg;

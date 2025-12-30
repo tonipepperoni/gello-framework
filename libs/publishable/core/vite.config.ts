@@ -11,7 +11,13 @@ export default defineConfig(() => ({
   plugins: [
     nxViteTsPaths(),
     nxCopyAssetsPlugin(['*.md']),
-    dts({ entryRoot: 'src', tsconfigPath: path.join(__dirname, 'tsconfig.lib.json'), skipDiagnostics: true }),
+    dts({
+      entryRoot: 'src',
+      tsconfigPath: path.join(__dirname, 'tsconfig.lib.json'),
+      skipDiagnostics: true,
+      pathsToAliases: false,
+      outDir: './dist',
+    }),
   ],
   build: {
     outDir: './dist',
@@ -25,7 +31,8 @@ export default defineConfig(() => ({
       formats: ['es' as const],
     },
     rollupOptions: {
-      external: [/^effect/, /^@effect/, /^@gello\//],
+      // Bundle internal @gello/core-* packages, externalize only effect/platform
+      external: [/^effect/, /^@effect/, /^node:/],
     },
   },
 }));

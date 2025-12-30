@@ -6,14 +6,17 @@ import * as path from 'node:path';
 import { execSync } from 'node:child_process';
 import type {
   ProjectType,
+  StarterTemplate,
   InfrastructureConfig,
   FeatureFlags,
   PackageManager,
 } from '../../components/wizard/types.js';
+import { templateRegistry } from '../../templates/index.js';
 
 export interface CreateProjectOptions {
   projectName: string;
   projectType: ProjectType;
+  template: StarterTemplate;
   infrastructure: InfrastructureConfig;
   features: FeatureFlags;
   packageManager: PackageManager;
@@ -36,8 +39,12 @@ const step = async (
 };
 
 export const createProject = async (options: CreateProjectOptions): Promise<void> => {
-  const { projectName, projectType, infrastructure, features, packageManager, onProgress } = options;
+  const { projectName, projectType, template, infrastructure, features, packageManager, onProgress } = options;
   const projectPath = path.resolve(process.cwd(), projectName);
+
+  // Track template dependencies to add later
+  let templateDeps: string[] = [];
+  let templateDevDeps: string[] = [];
 
   // Check if directory exists
   if (fs.existsSync(projectPath)) {
@@ -99,6 +106,33 @@ export const createProject = async (options: CreateProjectOptions): Promise<void
     }, onProgress);
   }
 
+  // Apply starter template
+  if (template !== 'empty') {
+    await step(`Applying ${template} template`, async () => {
+      const result = templateRegistry.generate(template, {
+        projectName,
+        projectType,
+        infrastructure,
+        features,
+        packageManager,
+      });
+
+      // Write template files
+      for (const [filePath, content] of result.files) {
+        const fullPath = path.join(projectPath, filePath);
+        const dir = path.dirname(fullPath);
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+        fs.writeFileSync(fullPath, content);
+      }
+
+      // Save template dependencies to add later
+      templateDeps = result.dependencies;
+      templateDevDeps = result.devDependencies;
+    }, onProgress);
+  }
+
   // Create environment files
   await step('Creating environment configuration', async () => {
     await createEnvFiles(projectPath, infrastructure, features);
@@ -106,7 +140,7 @@ export const createProject = async (options: CreateProjectOptions): Promise<void
 
   // Create root config files
   await step('Creating configuration files', async () => {
-    await createRootConfigs(projectPath, projectName, projectType, features);
+    await createRootConfigs(projectPath, projectName, projectType, features, templateDeps, templateDevDeps);
   }, onProgress);
 
   // Install dependencies
@@ -200,14 +234,14 @@ async function createApiApp(
       dev: {
         executor: 'nx:run-commands',
         options: {
-          command: 'tsx --watch src/main.ts',
+          command: 'node --import tsx --watch src/main.ts',
           cwd: 'apps/api',
         },
       },
       serve: {
         executor: 'nx:run-commands',
         options: {
-          command: 'tsx src/main.ts',
+          command: 'node --import tsx src/main.ts',
           cwd: 'apps/api',
         },
       },
@@ -237,7 +271,7 @@ async function createApiApp(
       outDir: './dist',
       rootDir: './src',
     },
-    include: ['src/**/*.ts'],
+    include: ['src/**/*.ts', '../../types/**/*.d.ts'],
     exclude: ['node_modules', 'dist'],
   };
   fs.writeFileSync(
@@ -789,9 +823,9 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   const variantStyles = {
-    primary: { backgroundColor: '#8B5CF6', color: 'white' },
-    secondary: { backgroundColor: '#6B7280', color: 'white' },
-    outline: { backgroundColor: 'transparent', border: '1px solid #8B5CF6', color: '#8B5CF6' },
+    primary: { backgroundColor: '#3b82f6', color: '#ffffff' },
+    secondary: { backgroundColor: '#272727', color: '#fafafa' },
+    outline: { backgroundColor: 'transparent', border: '1px solid #3b82f6', color: '#3b82f6' },
   };
 
   return (
@@ -985,20 +1019,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primary: {
-    backgroundColor: '#8B5CF6',
+    backgroundColor: '#3b82f6',
   },
   secondary: {
-    backgroundColor: '#E5E7EB',
+    backgroundColor: '#272727',
   },
   text: {
     fontSize: 16,
     fontWeight: '600',
   },
   textPrimary: {
-    color: '#FFFFFF',
+    color: '#ffffff',
   },
   textSecondary: {
-    color: '#374151',
+    color: '#fafafa',
   },
 });
 `;
@@ -1189,7 +1223,9 @@ async function createRootConfigs(
   projectPath: string,
   projectName: string,
   projectType: ProjectType,
-  features: FeatureFlags
+  features: FeatureFlags,
+  templateDeps: string[] = [],
+  templateDevDeps: string[] = []
 ): Promise<void> {
   // tsconfig.base.json
   const hasFrontend = projectType !== 'api-only';
@@ -1197,6 +1233,11 @@ async function createRootConfigs(
 
   const paths: Record<string, string[]> = {
     [`@${projectName}/contracts`]: ['libs/contracts/src/index.ts'],
+    // Map @gello/* to type declarations (workaround for bundled package types)
+    '@gello/platform-node': ['types/gello-platform-node.d.ts'],
+    '@gello/core': ['types/gello-core.d.ts'],
+    '@gello/common': ['types/gello-common.d.ts'],
+    '@gello/auth': ['types/gello-auth.d.ts'],
   };
 
   if (features.openapi) {
@@ -1225,7 +1266,9 @@ async function createRootConfigs(
       sourceMap: true,
       baseUrl: '.',
       paths,
+      typeRoots: ['./types', './node_modules/@types'],
     },
+    include: ['types/**/*.d.ts'],
     exclude: ['node_modules', 'dist'],
   };
   fs.writeFileSync(
@@ -1260,6 +1303,14 @@ async function createRootConfigs(
     deps['expo-router'] = '^4.0.0';
     deps['react'] = '^18.3.0';
     deps['react-native'] = '^0.76.0';
+  }
+
+  // Add template dependencies
+  for (const dep of templateDeps) {
+    deps[dep] = 'latest';
+  }
+  for (const devDep of templateDevDeps) {
+    devDeps[devDep] = 'latest';
   }
 
   const scripts: Record<string, string> = {

@@ -423,26 +423,31 @@ importers:
         specifier: ^0.4.0
         version: 0.4.4
 
-  libs/publishable/auth:
+  libs/publishable/auth: {}
+
+  libs/publishable/auth/dist: {}
+
+  libs/publishable/auth/dist/tools/cli/tools/cli:
     dependencies:
-      '@gello/auth-authorization':
-        specifier: workspace:*
-        version: link:../../auth/authorization
-      '@gello/auth-core':
-        specifier: workspace:*
-        version: link:../../auth/core
-      '@gello/auth-session':
-        specifier: workspace:*
-        version: link:../../auth/session
-      '@gello/auth-social':
-        specifier: workspace:*
-        version: link:../../auth/social
-      '@gello/auth-templates':
-        specifier: workspace:*
-        version: link:../../auth/templates
-      '@gello/auth-testing':
-        specifier: workspace:*
-        version: link:../../auth/testing
+      ink:
+        specifier: ^5.2.1
+        version: 5.2.1(@types/react@18.3.27)(react@18.3.1)
+      ink-select-input:
+        specifier: ^6.2.0
+        version: 6.2.0(ink@5.2.1(@types/react@18.3.27)(react@18.3.1))(react@18.3.1)
+      ink-spinner:
+        specifier: ^5.0.0
+        version: 5.0.0(ink@5.2.1(@types/react@18.3.27)(react@18.3.1))(react@18.3.1)
+      ink-text-input:
+        specifier: ^6.0.0
+        version: 6.0.0(ink@5.2.1(@types/react@18.3.27)(react@18.3.1))(react@18.3.1)
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+    devDependencies:
+      '@types/react':
+        specifier: '18'
+        version: 18.3.27
 
   libs/publishable/common: {}
 

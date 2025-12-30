@@ -1,6 +1,6 @@
 {
   "name": "@gello/common",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "description": "Common utilities for Gello framework - middleware, routing, validation",
   "keywords": [
     "gello",
@@ -16,16 +16,19 @@
     "url": "https://github.com/tonipepperoni/gello-framework"
   },
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./index.js",
+  "types": "./index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "types": "./index.d.ts",
+      "import": "./index.js",
+      "default": "./index.js"
     }
   },
   "files": [
-    "dist"
+    "index.js",
+    "index.d.ts",
+    "index.d.ts.map"
   ],
   "engines": {
     "node": ">=20.0.0"

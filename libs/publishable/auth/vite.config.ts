@@ -7,7 +7,7 @@ import { nxCopyAssetsPlugin } from '@nx/vite/plugins/nx-copy-assets.plugin';
 
 export default defineConfig(() => ({
   root: __dirname,
-  cacheDir: '../../../node_modules/.vite/libs/publishable/common',
+  cacheDir: '../../../node_modules/.vite/libs/publishable/auth',
   plugins: [
     nxViteTsPaths(),
     nxCopyAssetsPlugin(['*.md']),
@@ -26,13 +26,21 @@ export default defineConfig(() => ({
     commonjsOptions: { transformMixedEsModules: true },
     lib: {
       entry: 'src/index.ts',
-      name: 'gello-common',
+      name: 'gello-auth',
       fileName: 'index',
       formats: ['es' as const],
     },
     rollupOptions: {
-      // Bundle internal @gello/core-* packages, externalize effect and @gello/core (published peer)
-      external: [/^effect/, /^@effect/, /^@gello\/core$/, /^node:/],
+      // Bundle @gello/auth-* packages (internal), externalize everything else
+      external: [
+        /^effect/,
+        /^@effect/,
+        /^@gello\/core$/,
+        /^@gello\/common$/,
+        /^@gello\/platform-node$/,
+        /^react/,
+        /^@react-email/,
+      ],
     },
   },
 }));

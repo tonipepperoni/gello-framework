@@ -268,6 +268,50 @@ importers:
 
   apps/todo: {}
 
+  libs/auth/authorization:
+    dependencies:
+      '@gello/auth-core':
+        specifier: workspace:*
+        version: link:../core
+
+  libs/auth/core: {}
+
+  libs/auth/session:
+    dependencies:
+      '@gello/auth-core':
+        specifier: workspace:*
+        version: link:../core
+
+  libs/auth/social:
+    dependencies:
+      '@gello/auth-core':
+        specifier: workspace:*
+        version: link:../core
+      '@gello/auth-session':
+        specifier: workspace:*
+        version: link:../session
+
+  libs/auth/templates:
+    dependencies:
+      '@gello/auth-core':
+        specifier: workspace:*
+        version: link:../core
+      '@gello/mail-templates':
+        specifier: workspace:*
+        version: link:../../mail/templates
+
+  libs/auth/testing:
+    dependencies:
+      '@gello/auth-authorization':
+        specifier: workspace:*
+        version: link:../authorization
+      '@gello/auth-core':
+        specifier: workspace:*
+        version: link:../core
+      '@gello/auth-session':
+        specifier: workspace:*
+        version: link:../session
+
   libs/cache/core:
     dependencies:
       effect:
@@ -369,6 +413,27 @@ importers:
   libs/mail/drivers: {}
 
   libs/mail/templates: {}
+
+  libs/publishable/auth:
+    dependencies:
+      '@gello/auth-authorization':
+        specifier: workspace:*
+        version: link:../../auth/authorization
+      '@gello/auth-core':
+        specifier: workspace:*
+        version: link:../../auth/core
+      '@gello/auth-session':
+        specifier: workspace:*
+        version: link:../../auth/session
+      '@gello/auth-social':
+        specifier: workspace:*
+        version: link:../../auth/social
+      '@gello/auth-templates':
+        specifier: workspace:*
+        version: link:../../auth/templates
+      '@gello/auth-testing':
+        specifier: workspace:*
+        version: link:../../auth/testing
 
   libs/publishable/common: {}
 

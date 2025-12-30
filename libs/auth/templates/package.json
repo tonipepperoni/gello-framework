@@ -1,0 +1,22 @@
+{
+  "name": "@gello/auth-templates",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    }
+  },
+  "dependencies": {
+    "@gello/auth-core": "workspace:*",
+    "@gello/mail-templates": "workspace:*"
+  },
+  "peerDependencies": {
+    "effect": "^3.0.0",
+    "react": "^18.0.0"
+  }
+}

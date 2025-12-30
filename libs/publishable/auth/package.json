@@ -27,11 +27,11 @@
     "effect": "^3.0.0"
   },
   "dependencies": {
-    "@gello/auth-core": "*",
-    "@gello/auth-session": "*",
-    "@gello/auth-authorization": "*",
-    "@gello/auth-social": "*",
-    "@gello/auth-templates": "*",
-    "@gello/auth-testing": "*"
+    "@gello/auth-core": "workspace:*",
+    "@gello/auth-session": "workspace:*",
+    "@gello/auth-authorization": "workspace:*",
+    "@gello/auth-social": "workspace:*",
+    "@gello/auth-templates": "workspace:*",
+    "@gello/auth-testing": "workspace:*"
   }
 }

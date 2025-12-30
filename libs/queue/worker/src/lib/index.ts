@@ -1,2 +1,2 @@
-export * from "./Worker"
-export * from "./WorkerPool"
+export * from "./Worker.js"
+export * from "./WorkerPool.js"

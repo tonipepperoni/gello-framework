@@ -417,7 +417,11 @@ importers:
 
   libs/mail/templates: {}
 
-  libs/openapi: {}
+  libs/openapi:
+    devDependencies:
+      '@hey-api/client-fetch':
+        specifier: ^0.4.0
+        version: 0.4.4
 
   libs/publishable/auth:
     dependencies:
@@ -2299,6 +2303,10 @@ packages:
         optional: true
       tailwindcss:
         optional: true
+
+  '@hey-api/client-fetch@0.4.4':
+    resolution: {integrity: sha512-ebh1JjUdMAqes/Rg8OvbjDqGWGNhgHgmPtHlkIOUtj3y2mUXqX2g9sVoI/rSKW/FdADPng/90k5AL7bwT8W2lA==}
+    deprecated: Starting with v0.73.0, this package is bundled directly inside @hey-api/openapi-ts.
 
   '@humanfs/core@0.19.1':
     resolution: {integrity: sha512-5DyQ4+1JEUzejeK1JGICcideyfUbGixgS9jNgex5nqkW+cY7WZhxBigmieN5Qnw9ZosSNVC9KQKyb+GUaGyKUA==}
@@ -10895,6 +10903,8 @@ snapshots:
       - supports-color
       - waku
       - zod
+
+  '@hey-api/client-fetch@0.4.4': {}
 
   '@humanfs/core@0.19.1': {}
 

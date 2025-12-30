@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://gello.net/logo.svg" alt="Gello" width="400" />
+  <img src="https://gello.net/logo.svg" alt="Gello" width="200" />
 </p>
 
 <p align="center">
@@ -33,11 +33,11 @@ class UserRepo extends Context.Tag("UserRepo")<UserRepo, {
 }>() {}
 
 // Use it in a route
-HttpRouter.get("/users/:id", Effect.gen(function* () {
-  const { id } = yield* HttpRouter.params
+route.get("/users/:id", Effect.gen(function* () {
+  const { id } = yield* Route.params
   const repo = yield* UserRepo
   const user = yield* repo.findById(id)
-  return yield* HttpServerResponse.json(user)
+  return Response.json(user)
 }))
 ```
 
@@ -67,7 +67,8 @@ Your server is running at `http://localhost:3000`.
 | **Validation** | Schema validation with `@effect/schema` at boundaries |
 | **Database** | Drizzle ORM with Effect-managed connection pools |
 | **Queues** | Pure Effect job queues — no Redis required |
-| **FP Utilities** | Optics (lenses), refined types, branded values |
+| **Mail** | Email sending with React templates |
+| **Auth** | Authentication, authorization, OAuth providers |
 | **CLI** | Project scaffolding, dev server, route inspection |
 
 ## Packages
@@ -78,6 +79,8 @@ pnpm add @gello/core @gello/common @gello/platform-node
 
 # Optional
 pnpm add @gello/queue      # Job queues
+pnpm add @gello/mail       # Email sending
+pnpm add @gello/auth       # Authentication
 pnpm add @gello/fp         # Optics, refined types
 pnpm add -D @gello/testing # Test utilities
 ```
@@ -88,37 +91,34 @@ pnpm add -D @gello/testing # Test utilities
 | `@gello/common` | Middleware, routing, validation |
 | `@gello/platform-node` | Node.js HTTP adapter |
 | `@gello/queue` | Effect-native queue system |
+| `@gello/mail` | Email with React templates |
+| `@gello/auth` | Authentication & authorization |
 | `@gello/fp` | Optics, refined types |
 | `@gello/testing` | Mocks and test utilities |
 
 ## Example
 
 ```typescript
-import { Effect, Layer, pipe } from "effect"
-import * as HttpRouter from "@effect/platform/HttpRouter"
-import * as HttpServer from "@effect/platform/HttpServer"
-import * as HttpServerResponse from "@effect/platform/HttpServerResponse"
-import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer"
-import * as NodeRuntime from "@effect/platform-node/NodeRuntime"
-import { createServer } from "node:http"
+import { Effect, Layer } from "effect"
+import { NodeServer, route, Route, Response } from "@gello/platform-node"
 
-// Routes as values
-const routes = pipe(
-  HttpRouter.empty,
-  HttpRouter.get("/", Effect.succeed(HttpServerResponse.json({ status: "ok" }))),
-  HttpRouter.get("/users/:id", Effect.gen(function* () {
-    const { id } = yield* HttpRouter.params
-    return yield* HttpServerResponse.json({ id })
+// Define routes
+const routes = Route.group({ prefix: "/api" }, [
+  route.get("/", Effect.succeed(Response.json({ status: "ok" }))),
+
+  route.get("/users/:id", Effect.gen(function* () {
+    const { id } = yield* Route.params
+    return Response.json({ id })
   }))
-)
+])
 
-// Compose and launch
-const server = pipe(
-  HttpServer.serve(HttpRouter.toHttpApp(routes)),
-  Layer.provide(NodeHttpServer.layer(createServer, { port: 3000 }))
-)
-
-Layer.launch(server).pipe(NodeRuntime.runMain)
+// Start server
+NodeServer.make({ port: 3000 })
+  .pipe(
+    Layer.provide(routes),
+    Layer.launch,
+    Effect.runPromise
+  )
 ```
 
 ## CLI
@@ -129,45 +129,16 @@ npx gello serve           # Start dev server with hot reload
 npx gello route:list      # Display registered routes
 ```
 
-The `route:list` command shows a beautiful TUI with your registered routes.
-
-## Architecture
-
-Gello follows **hexagonal architecture** with Effect's Layer system:
-
-```
-┌─────────────────────────────────────┐
-│            Your App                 │
-│  (Routes, Handlers, Business Logic) │
-└──────────────┬──────────────────────┘
-               │ yield*
-┌──────────────▼──────────────────────┐
-│           Services                  │
-│  (UserRepo, EmailService, etc.)     │
-│  Context.Tag + Layer                │
-└──────────────┬──────────────────────┘
-               │ Layer.provide
-┌──────────────▼──────────────────────┐
-│          Infrastructure             │
-│  (Database, Cache, Queue, HTTP)     │
-│  Layer.scoped + acquireRelease      │
-└─────────────────────────────────────┘
-               │
-         Layer.launch
-```
-
-Everything composes at the edge. No hidden state, no runtime surprises.
-
 ## Documentation
 
 Full documentation at **[gello.net/docs](https://gello.net/docs)**
 
 - [Installation](https://gello.net/docs/installation)
-- [HTTP Server](https://gello.net/docs/http)
+- [Your First App](https://gello.net/docs/first-app)
 - [Routing](https://gello.net/docs/routing)
 - [Middleware](https://gello.net/docs/middleware)
-- [Dependency Injection](https://gello.net/docs/dependency-injection)
 - [Validation](https://gello.net/docs/validation)
+- [Authentication](https://gello.net/docs/authentication)
 - [Database](https://gello.net/docs/database)
 - [Queues](https://gello.net/docs/queues)
 - [CLI](https://gello.net/docs/cli)

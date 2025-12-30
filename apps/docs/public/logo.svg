@@ -1,16 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 100" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 50" fill="none">
   <defs>
-    <linearGradient id="text-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#8B5CF6"/>
-      <stop offset="100%" style="stop-color:#C4B5FD"/>
+    <linearGradient id="gello-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B5CF6"/>
+      <stop offset="100%" stop-color="#C4B5FD"/>
     </linearGradient>
   </defs>
-  <text font-family="monospace" font-size="14" font-weight="bold" fill="url(#text-gradient)">
-    <tspan x="10" y="20"> ██████╗ ███████╗██╗     ██╗      ██████╗ </tspan>
-    <tspan x="10" y="35">██╔════╝ ██╔════╝██║     ██║     ██╔═══██╗</tspan>
-    <tspan x="10" y="50">██║  ███╗█████╗  ██║     ██║     ██║   ██║</tspan>
-    <tspan x="10" y="65">██║   ██║██╔══╝  ██║     ██║     ██║   ██║</tspan>
-    <tspan x="10" y="80">╚██████╔╝███████╗███████╗███████╗╚██████╔╝</tspan>
-    <tspan x="10" y="95"> ╚═════╝ ╚══════╝╚══════╝╚══════╝ ╚═════╝ </tspan>
-  </text>
+  <text x="10" y="38" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace" font-size="42" font-weight="700" fill="url(#gello-gradient)">gello</text>
 </svg>

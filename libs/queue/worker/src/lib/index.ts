@@ -1,2 +1,2 @@
-export * from "./Worker.ts"
-export * from "./WorkerPool.ts"
+export * from "./Worker.js"
+export * from "./WorkerPool.js"

@@ -1,8 +1,15 @@
 {
   "name": "@gello/queue",
-  "version": "0.1.1",
+  "version": "0.0.0",
   "description": "Effect-based queue system for Gello framework",
-  "keywords": ["gello", "effect", "typescript", "queue", "jobs", "workers"],
+  "keywords": [
+    "gello",
+    "effect",
+    "typescript",
+    "queue",
+    "jobs",
+    "workers"
+  ],
   "author": "Gello Team",
   "license": "MIT",
   "repository": {
@@ -18,7 +25,9 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "engines": {
     "node": ">=20.0.0"
   },

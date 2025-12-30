@@ -13,9 +13,6 @@ export default defineConfig(() => ({
     nxCopyAssetsPlugin(['*.md']),
     dts({ entryRoot: 'src', tsconfigPath: path.join(__dirname, 'tsconfig.lib.json'), skipDiagnostics: true }),
   ],
-  resolve: {
-    extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json'],
-  },
   // Uncomment this if you are using workers.
   // worker: {
   //  plugins: [ nxViteTsPaths() ],

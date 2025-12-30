@@ -1,8 +1,16 @@
 {
   "name": "@gello/fp",
-  "version": "0.1.1",
+  "version": "0.1.0",
   "description": "Functional programming utilities - optics, refined types",
-  "keywords": ["gello", "effect", "typescript", "fp", "optics", "lens", "refined"],
+  "keywords": [
+    "gello",
+    "effect",
+    "typescript",
+    "fp",
+    "optics",
+    "lens",
+    "refined"
+  ],
   "author": "Gello Team",
   "license": "MIT",
   "repository": {
@@ -18,7 +26,9 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "engines": {
     "node": ">=20.0.0"
   },

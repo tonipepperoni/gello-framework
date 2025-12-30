@@ -1,8 +1,14 @@
 {
   "name": "@gello/core",
-  "version": "0.1.1",
+  "version": "0.1.0",
   "description": "Core module for Gello framework - contracts, errors, base types",
-  "keywords": ["gello", "effect", "typescript", "backend", "framework"],
+  "keywords": [
+    "gello",
+    "effect",
+    "typescript",
+    "backend",
+    "framework"
+  ],
   "author": "Gello Team",
   "license": "MIT",
   "repository": {
@@ -18,7 +24,9 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "engines": {
     "node": ">=20.0.0"
   },

@@ -1,8 +1,14 @@
 {
   "name": "@gello/common",
-  "version": "0.1.1",
+  "version": "0.1.0",
   "description": "Common utilities for Gello framework - middleware, routing, validation",
-  "keywords": ["gello", "effect", "typescript", "middleware", "validation"],
+  "keywords": [
+    "gello",
+    "effect",
+    "typescript",
+    "middleware",
+    "validation"
+  ],
   "author": "Gello Team",
   "license": "MIT",
   "repository": {
@@ -18,7 +24,9 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "engines": {
     "node": ">=20.0.0"
   },

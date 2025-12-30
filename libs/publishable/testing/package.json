@@ -1,8 +1,14 @@
 {
   "name": "@gello/testing",
-  "version": "0.1.1",
+  "version": "0.1.0",
   "description": "Testing utilities and mocks for Gello applications",
-  "keywords": ["gello", "effect", "typescript", "testing", "mocks"],
+  "keywords": [
+    "gello",
+    "effect",
+    "typescript",
+    "testing",
+    "mocks"
+  ],
   "author": "Gello Team",
   "license": "MIT",
   "repository": {
@@ -18,7 +24,9 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "engines": {
     "node": ">=20.0.0"
   },

@@ -91,6 +91,96 @@ export const route = {
   }),
 };
 
+// ============================================================================
+// Route Groups - Apply prefix and middleware to multiple routes
+// ============================================================================
+
+/**
+ * Route group configuration.
+ */
+export interface RouteGroupConfig {
+  readonly prefix?: string;
+  readonly middleware?: readonly Middleware[];
+}
+
+/**
+ * A route group item - can be a route or nested group.
+ */
+export type RouteGroupItem<R = never> = Route<R> | readonly Route<R>[];
+
+/**
+ * Flatten nested route arrays into a single array.
+ */
+const flattenRoutes = <R>(items: readonly RouteGroupItem<R>[]): Route<R>[] => {
+  const result: Route<R>[] = [];
+  for (const item of items) {
+    if (Array.isArray(item)) {
+      result.push(...item);
+    } else {
+      result.push(item as Route<R>);
+    }
+  }
+  return result;
+};
+
+/**
+ * Normalize path by removing trailing slashes and ensuring leading slash.
+ */
+const normalizePath = (path: string): string => {
+  if (path === '/') return '';
+  return path.startsWith('/') ? path.replace(/\/+$/, '') : `/${path}`.replace(/\/+$/, '');
+};
+
+/**
+ * Create a route group with shared prefix and/or middleware.
+ *
+ * @example
+ * ```typescript
+ * // Simple prefix
+ * const apiRoutes = Route.group({ prefix: '/api' }, [
+ *   route.get('/users', listUsers),
+ *   route.post('/users', createUser),
+ * ]);
+ *
+ * // With middleware
+ * const authRoutes = Route.group({
+ *   prefix: '/api',
+ *   middleware: [authenticate()]
+ * }, [
+ *   route.get('/me', getCurrentUser),
+ *   route.get('/tokens', listTokens),
+ * ]);
+ *
+ * // Nested groups
+ * const adminRoutes = Route.group({ prefix: '/admin', middleware: [requireAdmin()] }, [
+ *   Route.group({ prefix: '/users' }, [
+ *     route.get('/', listUsers),
+ *     route.post('/', createUser),
+ *   ]),
+ *   Route.group({ prefix: '/posts' }, [
+ *     route.get('/', listPosts),
+ *     route.delete('/:id', deletePost),
+ *   ]),
+ * ]);
+ * ```
+ */
+export const Route = {
+  group: <R>(
+    config: RouteGroupConfig,
+    routes: readonly RouteGroupItem<R>[]
+  ): Route<R>[] => {
+    const prefix = config.prefix ? normalizePath(config.prefix) : '';
+    const groupMiddleware = config.middleware ?? [];
+    const flatRoutes = flattenRoutes(routes);
+
+    return flatRoutes.map((r) => ({
+      ...r,
+      path: `${prefix}${normalizePath(r.path)}` || '/',
+      middleware: [...groupMiddleware, ...(r.middleware ?? [])],
+    }));
+  },
+};
+
 /**
  * Compiled route for efficient matching.
  */

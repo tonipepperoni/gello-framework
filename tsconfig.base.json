@@ -23,6 +23,13 @@
     "target": "ES2022",
     "paths": {
       "@gello/adapters-logger": ["libs/core/adapters/logger/src/index.ts"],
+      "@gello/auth": ["libs/publishable/auth/src/index.ts"],
+      "@gello/auth-authorization": ["libs/auth/authorization/src/index.ts"],
+      "@gello/auth-core": ["libs/auth/core/src/index.ts"],
+      "@gello/auth-session": ["libs/auth/session/src/index.ts"],
+      "@gello/auth-social": ["libs/auth/social/src/index.ts"],
+      "@gello/auth-templates": ["libs/auth/templates/src/index.ts"],
+      "@gello/auth-testing": ["libs/auth/testing/src/index.ts"],
       "@gello/cache": ["libs/cache/core/src/index.ts"],
       "@gello/cache-drivers": ["libs/cache/drivers/src/index.ts"],
       "@gello/cli": ["tools/cli/src/index.ts"],

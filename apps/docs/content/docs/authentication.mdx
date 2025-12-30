@@ -1,0 +1,814 @@
+---
+title: Authentication
+description: Complete authentication and authorization system with API tokens, sessions, OAuth, and CASL-style abilities
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Steps, Step } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+Gello's authentication system provides a comprehensive solution for API token authentication, session management, OAuth social login, and fine-grained authorization. Inspired by Laravel Sanctum and CASL, it offers a flexible, Effect-native approach to securing your applications.
+
+<Callout type="info" title="Effect-Native">
+Authentication uses `Context.Tag` for services, `Layer` for dependency injection,
+branded types for type safety, and Effect primitives for typed errors.
+</Callout>
+
+## Packages Overview
+
+| Package | Description |
+|---------|-------------|
+| `@gello/auth-core` | Core authentication: tokens, services, middleware |
+| `@gello/auth-session` | Session management, JWT, CSRF protection |
+| `@gello/auth-authorization` | CASL-style abilities and authorization |
+| `@gello/auth-social` | OAuth providers (GitHub, Google) |
+| `@gello/auth-templates` | Pre-built email templates for auth flows |
+| `@gello/auth-testing` | Testing utilities and mocks |
+
+## Getting Started
+
+<Steps>
+<Step>
+### Install Dependencies
+
+```bash
+pnpm add @gello/auth
+# Or install specific packages:
+pnpm add @gello/auth-core @gello/auth-session @gello/auth-authorization
+```
+</Step>
+
+<Step>
+### Create Your User Provider
+
+Implement the `UserProvider` port to connect auth with your user model:
+
+```typescript
+import { Effect, Layer, Option } from "effect"
+import { UserProviderTag, type Authenticatable } from "@gello/auth-core"
+
+interface User extends Authenticatable {
+  id: string
+  email: string
+  password: string // Hashed password
+  name: string
+}
+
+const UserProviderLive = Layer.succeed(UserProviderTag, {
+  findById: (id) =>
+    Effect.gen(function* () {
+      const user = yield* db.users.findById(id)
+      return user ? Option.some(user) : Option.none()
+    }),
+
+  findByEmail: (email) =>
+    Effect.gen(function* () {
+      const user = yield* db.users.findByEmail(email)
+      return user ? Option.some(user) : Option.none()
+    }),
+
+  findByCredentials: (credentials) =>
+    Effect.gen(function* () {
+      const user = yield* db.users.findOne(credentials)
+      return user ? Option.some(user) : Option.none()
+    }),
+})
+```
+</Step>
+
+<Step>
+### Set Up Password Hashing
+
+Provide a password hasher implementation:
+
+```typescript
+import { Effect, Layer } from "effect"
+import { PasswordHasherTag, TokenHasherTag } from "@gello/auth-core"
+import * as bcrypt from "bcrypt"
+import * as crypto from "crypto"
+
+const PasswordHasherLive = Layer.succeed(PasswordHasherTag, {
+  hash: (password) =>
+    Effect.promise(() => bcrypt.hash(password, 12)),
+
+  verify: (password, hash) =>
+    Effect.promise(() => bcrypt.compare(password, hash)),
+
+  needsRehash: (hash) => {
+    // Check if hash uses old cost factor
+    const rounds = bcrypt.getRounds(hash)
+    return rounds < 12
+  },
+})
+
+const TokenHasherLive = Layer.succeed(TokenHasherTag, {
+  hash: (token) =>
+    crypto.createHash("sha256").update(token).digest("hex"),
+
+  verify: (token, hash) =>
+    crypto.createHash("sha256").update(token).digest("hex") === hash,
+})
+```
+</Step>
+
+<Step>
+### Wire Up the Auth Layer
+
+```typescript
+import { Layer, pipe } from "effect"
+import {
+  AuthServiceLive,
+  TokenServiceLive,
+} from "@gello/auth-core"
+
+const AuthLayer = pipe(
+  AuthServiceLive,
+  Layer.provide(TokenServiceLive),
+  Layer.provide(TokenStoreLive),      // Your token store implementation
+  Layer.provide(UserProviderLive),
+  Layer.provide(PasswordHasherLive),
+  Layer.provide(TokenHasherLive),
+)
+```
+</Step>
+</Steps>
+
+## Personal Access Tokens
+
+API tokens provide a simple way to authenticate API requests. Each token has scopes that limit what it can do.
+
+### Creating Tokens
+
+```typescript
+import { Effect } from "effect"
+import { AuthTag, UserId } from "@gello/auth-core"
+
+const createApiToken = Effect.gen(function* () {
+  const auth = yield* AuthTag
+
+  // Create a token with specific scopes
+  const { accessToken, plainTextToken } = yield* auth.createToken(
+    UserId("user-123"),
+    "My API Token",
+    ["posts:read", "posts:write"],
+    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+  )
+
+  // Return the plain text token to the user ONCE
+  // This is the only time they can see it!
+  return plainTextToken
+})
+```
+
+### Token Scopes
+
+Scopes act as a "ceiling" on what a token can do:
+
+```typescript
+// Wildcard scope - can do everything
+const adminToken = yield* auth.createToken(userId, "Admin", ["*"])
+
+// Read-only scope
+const readToken = yield* auth.createToken(userId, "Reader", ["posts:read"])
+
+// Multiple specific scopes
+const editorToken = yield* auth.createToken(userId, "Editor", [
+  "posts:read",
+  "posts:write",
+  "comments:read",
+  "comments:write",
+])
+```
+
+### Authenticating Requests
+
+Use the `authenticate` middleware to require authentication:
+
+```typescript
+import { Effect, pipe } from "effect"
+import { HttpRouter } from "@effect/platform"
+import { authenticate, tokenScopes, AuthenticatedUserTag } from "@gello/auth-core"
+import { Route } from "@gello/platform-node"
+
+// Protect routes with authentication
+const protectedRoutes = Route.group({
+  prefix: "/api",
+  middleware: [authenticate()],
+}, [
+  route.get("/me", Effect.gen(function* () {
+    const user = yield* AuthenticatedUserTag
+    return { id: user.id, scopes: user.token?.scopes }
+  })),
+])
+
+// Require specific scopes
+const adminRoutes = Route.group({
+  prefix: "/api/admin",
+  middleware: [authenticate(), tokenScopes("admin")],
+}, [
+  route.get("/users", listAllUsers),
+  route.delete("/users/:id", deleteUser),
+])
+
+// Require any of multiple scopes (OR logic)
+const contentRoutes = Route.group({
+  prefix: "/api/content",
+  middleware: [authenticate(), tokenScope("posts:write", "admin")],
+}, [
+  route.post("/posts", createPost),
+])
+```
+
+### HasApiTokens Mixin
+
+Add token management methods directly to your user model:
+
+```typescript
+import { withApiTokens, type HasApiTokens } from "@gello/auth-core"
+
+// Wrap your user with token capabilities
+const userWithTokens = withApiTokens(user)
+
+// Now you can manage tokens from the user
+const { plainTextToken } = yield* userWithTokens.createToken("CLI Token", ["*"])
+const allTokens = yield* userWithTokens.tokens()
+yield* userWithTokens.revokeToken(tokenId)
+yield* userWithTokens.revokeAllTokens()
+```
+
+## Session Authentication
+
+For browser-based applications, use session authentication with CSRF protection.
+
+### Session Middleware
+
+```typescript
+import { session, csrf } from "@gello/auth-session"
+import { Route } from "@gello/platform-node"
+
+// Session-protected routes
+const webRoutes = Route.group({
+  prefix: "/web",
+  middleware: [session(), csrf()],
+}, [
+  route.get("/dashboard", showDashboard),
+  route.post("/settings", updateSettings),
+])
+
+// Optional session (for mixed auth)
+const mixedRoutes = Route.group({
+  middleware: [session.optional()],
+}, [
+  route.get("/profile", showProfile), // Works with or without session
+])
+```
+
+### Session Management
+
+```typescript
+import { Effect } from "effect"
+import { SessionServiceTag, SessionId, CsrfToken } from "@gello/auth-session"
+
+// Create a new session
+const login = Effect.gen(function* () {
+  const sessionService = yield* SessionServiceTag
+
+  const session = yield* sessionService.create(userId, {
+    ipAddress: request.ip,
+    userAgent: request.headers["user-agent"],
+  })
+
+  // Set session cookie in response
+  return {
+    sessionId: session.id,
+    csrfToken: session.csrfToken,
+  }
+})
+
+// Destroy session on logout
+const logout = Effect.gen(function* () {
+  const sessionService = yield* SessionServiceTag
+  const currentSession = yield* CurrentSessionTag
+
+  yield* sessionService.destroy(currentSession.id)
+})
+```
+
+### JWT Tokens
+
+For stateless authentication:
+
+```typescript
+import { JwtServiceTag } from "@gello/auth-session"
+
+const issueJwt = Effect.gen(function* () {
+  const jwt = yield* JwtServiceTag
+
+  const token = yield* jwt.sign({
+    sub: userId,
+    email: user.email,
+    scopes: ["posts:read"],
+  }, {
+    expiresIn: "7d",
+  })
+
+  return token
+})
+
+const verifyJwt = Effect.gen(function* () {
+  const jwt = yield* JwtServiceTag
+  const payload = yield* jwt.verify(token)
+  return payload.sub // User ID
+})
+```
+
+## Authorization (CASL-Style)
+
+Define fine-grained permissions with a fluent, CASL-inspired API.
+
+### Defining Abilities
+
+```typescript
+import { defineAbilitiesFor } from "@gello/auth-authorization"
+
+const abilities = defineAbilitiesFor(user, ({ can, cannot }) => {
+  // Everyone can read published posts
+  can("read", "Post", { published: true })
+
+  // Users can update their own posts
+  can("update", "Post", { authorId: user.id })
+
+  // Users can delete their own unpublished posts
+  can("delete", "Post", { authorId: user.id, published: false })
+
+  // Admins can do everything
+  if (user.role === "admin") {
+    can("manage", "all")
+  }
+
+  // No one can delete published posts
+  cannot("delete", "Post", { published: true })
+})
+```
+
+### Checking Permissions
+
+```typescript
+// Simple checks (returns boolean)
+if (abilities.can("read", post)) {
+  // Show the post
+}
+
+if (abilities.cannot("delete", post)) {
+  // Show "not allowed" message
+}
+
+// Effect-based authorization (throws on failure)
+const updatePost = Effect.gen(function* () {
+  const abilities = yield* AbilitiesTag
+
+  // Throws AuthorizationError if not allowed
+  yield* abilities.authorize("update", post)
+
+  // Proceed with update...
+  yield* db.posts.update(post.id, updates)
+})
+```
+
+### Authorization Middleware
+
+```typescript
+import {
+  authorizeMiddleware,
+  requireAdmin,
+  requireAny,
+} from "@gello/auth-authorization"
+
+// Require specific permission
+const postRoutes = Route.group({
+  prefix: "/posts/:id",
+  middleware: [
+    authenticate(),
+    authorizeMiddleware("update", () => getPostFromRequest()),
+  ],
+}, [
+  route.put("/", updatePost),
+])
+
+// Require admin access
+const adminRoutes = Route.group({
+  prefix: "/admin",
+  middleware: [authenticate(), requireAdmin()],
+}, [
+  route.get("/dashboard", adminDashboard),
+])
+
+// Require any of multiple abilities
+const moderatorRoutes = Route.group({
+  prefix: "/moderate",
+  middleware: [
+    authenticate(),
+    requireAny(["moderate", "admin"]),
+  ],
+}, [
+  route.post("/approve/:id", approveContent),
+])
+```
+
+### Providing Abilities Context
+
+```typescript
+import { AbilitiesTag, defineAbilitiesFor } from "@gello/auth-authorization"
+
+// In your request handler or middleware
+const withAbilities = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  Effect.gen(function* () {
+    const user = yield* AuthenticatedUserTag
+
+    const abilities = defineAbilitiesFor(user, ({ can, cannot }) => {
+      // Define abilities based on user
+      can("read", "Post")
+      if (user.role === "admin") {
+        can("manage", "all")
+      }
+    })
+
+    return yield* effect.pipe(
+      Effect.provideService(AbilitiesTag, abilities)
+    )
+  })
+```
+
+## OAuth / Social Login
+
+Authenticate users via OAuth providers like GitHub and Google.
+
+### Setting Up Providers
+
+```typescript
+import { Social, GithubProvider, GoogleProvider } from "@gello/auth-social"
+
+// Register providers
+const SocialLive = Social.register({
+  github: new GithubProvider({
+    clientId: process.env.GITHUB_CLIENT_ID!,
+    clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+    redirectUri: "https://myapp.com/auth/github/callback",
+  }),
+
+  google: new GoogleProvider({
+    clientId: process.env.GOOGLE_CLIENT_ID!,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    redirectUri: "https://myapp.com/auth/google/callback",
+  }),
+})
+```
+
+### OAuth Flow
+
+```typescript
+import { Social } from "@gello/auth-social"
+
+// Step 1: Redirect to provider
+const initiateOAuth = Effect.gen(function* () {
+  const provider = yield* Social.driver("github")
+
+  const { url, state } = yield* provider
+    .scopes(["user:email", "read:org"])
+    .redirect()
+
+  // Store state in session for verification
+  yield* session.set("oauth_state", state)
+
+  // Redirect user to GitHub
+  return Response.redirect(url)
+})
+
+// Step 2: Handle callback
+const handleCallback = Effect.gen(function* () {
+  const provider = yield* Social.driver("github")
+
+  // Get code and state from query params
+  const { code, state } = yield* getQueryParams()
+
+  // Verify state matches
+  const storedState = yield* session.get("oauth_state")
+  if (state !== storedState) {
+    return yield* Effect.fail(new OAuthStateMismatchError())
+  }
+
+  // Exchange code for user info
+  const socialUser = yield* provider.user(code, state)
+
+  // socialUser contains:
+  // - id: Provider's user ID
+  // - email: User's email
+  // - name: Display name
+  // - avatar: Profile picture URL
+  // - token: OAuth access token
+  // - raw: Raw provider response
+
+  // Find or create user in your database
+  const user = yield* findOrCreateUser(socialUser)
+
+  // Create session/token
+  const token = yield* auth.createToken(user.id, "OAuth Login", ["*"])
+
+  return { user, token }
+})
+
+// Stateless OAuth (no state verification)
+const statelessCallback = Effect.gen(function* () {
+  const provider = yield* Social.driver("github")
+
+  const socialUser = yield* provider
+    .stateless()
+    .user(code)
+
+  return socialUser
+})
+```
+
+## Email Templates
+
+Pre-built email templates for common authentication flows.
+
+### Available Templates
+
+```typescript
+import {
+  verifyEmail,
+  resetPassword,
+  welcomeEmail,
+  newLogin,
+} from "@gello/auth-templates"
+
+// Send verification email
+const sendVerification = Effect.gen(function* () {
+  const mail = yield* MailTag
+
+  yield* mail.send(
+    verifyEmail({
+      userName: user.name,
+      email: user.email,
+      verificationUrl: `https://myapp.com/verify?token=${token}`,
+      expiresIn: "60 minutes",
+      appName: "My App",
+    })
+  )
+})
+
+// Send password reset
+const sendPasswordReset = Effect.gen(function* () {
+  const mail = yield* MailTag
+
+  yield* mail.send(
+    resetPassword({
+      userName: user.name,
+      email: user.email,
+      resetUrl: `https://myapp.com/reset?token=${token}`,
+      expiresIn: "30 minutes",
+      ipAddress: request.ip,
+    })
+  )
+})
+
+// Send new login alert
+const sendLoginAlert = Effect.gen(function* () {
+  const mail = yield* MailTag
+
+  yield* mail.send(
+    newLogin({
+      userName: user.name,
+      email: user.email,
+      loginTime: new Date().toISOString(),
+      ipAddress: request.ip,
+      location: "San Francisco, CA",
+      device: "Chrome on macOS",
+      securityUrl: "https://myapp.com/security",
+    })
+  )
+})
+```
+
+## Testing
+
+Use the testing utilities for easy auth testing.
+
+### Mock Implementations
+
+```typescript
+import {
+  MockPasswordHasherLive,
+  MockTokenHasherLive,
+  MockTokenStoreLive,
+  MockUserProviderLive,
+  createMockUser,
+} from "@gello/auth-testing"
+
+// Create test users
+const testUser = createMockUser({
+  email: "test@example.com",
+  name: "Test User",
+  role: "admin",
+})
+
+// Set up test layer
+const TestAuthLayer = Layer.mergeAll(
+  MockPasswordHasherLive,
+  MockTokenHasherLive,
+  MockTokenStoreLive,
+  MockUserProviderLive([testUser]),
+  AuthServiceLive,
+  TokenServiceLive,
+)
+```
+
+### Acting As User
+
+```typescript
+import { Auth } from "@gello/auth-testing"
+
+describe("PostController", () => {
+  it("allows users to create posts", async () => {
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        // Authenticate as user with specific scopes
+        yield* Auth.actingAs(testUser, ["posts:write"])
+
+        // Now make authenticated requests
+        const response = yield* createPost({ title: "Hello" })
+
+        expect(response.status).toBe(201)
+      }).pipe(Effect.provide(TestAuthLayer))
+    )
+  })
+})
+```
+
+### Assertions
+
+```typescript
+import {
+  assertAuthenticated,
+  assertGuest,
+  assertCan,
+  assertCannot,
+  assertHasScope,
+} from "@gello/auth-testing"
+
+// Assert authentication state
+yield* assertAuthenticated()  // Fails if not logged in
+yield* assertGuest()          // Fails if logged in
+
+// Assert permissions
+yield* assertCan("update", post)
+yield* assertCannot("delete", post)
+
+// Assert token scopes
+yield* assertHasScope("posts:write")
+yield* assertLacksScope("admin")
+```
+
+## Route Groups
+
+Apply middleware to multiple routes at once:
+
+```typescript
+import { Route, route } from "@gello/platform-node"
+import { authenticate, tokenScopes } from "@gello/auth-core"
+
+// Group routes with shared middleware
+const apiRoutes = Route.group({
+  prefix: "/api/v1",
+  middleware: [authenticate()],
+}, [
+  // These routes require authentication
+  route.get("/me", getCurrentUser),
+  route.get("/tokens", listTokens),
+  route.post("/tokens", createToken),
+
+  // Nested group with additional middleware
+  Route.group({
+    prefix: "/admin",
+    middleware: [tokenScopes("admin")],
+  }, [
+    route.get("/users", listAllUsers),
+    route.delete("/users/:id", deleteUser),
+  ]),
+])
+```
+
+## Error Handling
+
+All auth operations return typed errors:
+
+```typescript
+import {
+  AuthenticationError,
+  TokenNotFoundError,
+  TokenExpiredError,
+  InsufficientScopeError,
+} from "@gello/auth-core"
+import { AuthorizationError } from "@gello/auth-authorization"
+import { OAuthTokenError, OAuthStateMismatchError } from "@gello/auth-social"
+
+const secureEndpoint = Effect.gen(function* () {
+  yield* doSomethingSecure()
+}).pipe(
+  Effect.catchTags({
+    AuthenticationError: (e) =>
+      Effect.succeed(Response.json({ error: e.message }, { status: 401 })),
+
+    InsufficientScopeError: (e) =>
+      Effect.succeed(Response.json({
+        error: "Insufficient permissions",
+        required: e.required,
+        provided: e.provided,
+      }, { status: 403 })),
+
+    AuthorizationError: (e) =>
+      Effect.succeed(Response.json({
+        error: "Not authorized",
+        action: e.action,
+      }, { status: 403 })),
+  })
+)
+```
+
+## Complete Example
+
+```typescript
+import { Effect, Layer, pipe } from "effect"
+import { HttpRouter } from "@effect/platform"
+import {
+  AuthTag,
+  AuthServiceLive,
+  TokenServiceLive,
+  authenticate,
+  tokenScopes,
+  AuthenticatedUserTag,
+} from "@gello/auth-core"
+import { defineAbilitiesFor, AbilitiesTag } from "@gello/auth-authorization"
+import { Route, route } from "@gello/platform-node"
+
+// Define routes
+const publicRoutes = [
+  route.post("/auth/login", login),
+  route.post("/auth/register", register),
+]
+
+const protectedRoutes = Route.group({
+  prefix: "/api",
+  middleware: [authenticate()],
+}, [
+  route.get("/me", Effect.gen(function* () {
+    const user = yield* AuthenticatedUserTag
+    return { id: user.id }
+  })),
+
+  route.post("/tokens", Effect.gen(function* () {
+    const auth = yield* AuthTag
+    const user = yield* AuthenticatedUserTag
+    const { plainTextToken } = yield* auth.createToken(
+      user.id,
+      "New Token",
+      ["posts:read"]
+    )
+    return { token: plainTextToken }
+  })),
+
+  // Admin routes
+  Route.group({
+    prefix: "/admin",
+    middleware: [tokenScopes("admin")],
+  }, [
+    route.get("/stats", getAdminStats),
+  ]),
+])
+
+// Compose the application
+const AppRouter = pipe(
+  HttpRouter.empty,
+  HttpRouter.concat(publicRoutes),
+  HttpRouter.concat(protectedRoutes),
+)
+
+// Layer composition
+const AuthLayer = pipe(
+  AuthServiceLive,
+  Layer.provide(TokenServiceLive),
+  Layer.provide(TokenStoreLive),
+  Layer.provide(UserProviderLive),
+  Layer.provide(PasswordHasherLive),
+  Layer.provide(TokenHasherLive),
+)
+
+const MainLayer = pipe(
+  HttpServer.serve(HttpRouter.toHttpApp(AppRouter)),
+  Layer.provide(AuthLayer),
+  Layer.provide(NodeHttpServer.layer(createServer, { port: 3000 })),
+)
+
+Layer.launch(MainLayer).pipe(NodeRuntime.runMain)
+```

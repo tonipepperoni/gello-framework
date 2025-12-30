@@ -1,0 +1,29 @@
+{
+  "name": "gello-auth",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/publishable/auth/src",
+  "projectType": "library",
+  "tags": ["publishable"],
+  "targets": {
+    "build": {
+      "executor": "@nx/esbuild:esbuild",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/publishable/auth",
+        "main": "libs/publishable/auth/src/index.ts",
+        "tsConfig": "libs/publishable/auth/tsconfig.lib.json",
+        "assets": [],
+        "format": ["cjs"],
+        "generatePackageJson": true
+      }
+    },
+    "publish": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npm publish --access public",
+        "cwd": "dist/libs/publishable/auth"
+      },
+      "dependsOn": ["build"]
+    }
+  }
+}

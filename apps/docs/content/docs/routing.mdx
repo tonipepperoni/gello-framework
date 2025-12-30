@@ -91,33 +91,101 @@ runApp(app, AppLayer)
 
 ## Route Groups
 
-Organize related routes by defining them in separate files and combining them.
+Use `Route.group()` to apply shared prefixes and middleware to multiple routes. This is especially useful for organizing API endpoints and applying authentication.
+
+### Basic Prefix
 
 ```typescript
-// routes/users.ts
-export const userRoutes = [
-  route.get("/users", listUsers),
-  route.get("/users/:id", getUser),
-  route.post("/users", createUser),
-] as const
+import { Route, route } from "@gello/core-adapters-node"
 
-// routes/posts.ts
-export const postRoutes = [
-  route.get("/posts", listPosts),
-  route.get("/posts/:id", getPost),
-] as const
+// All routes get /api prefix
+const apiRoutes = Route.group({ prefix: "/api" }, [
+  route.get("/users", listUsers),      // GET /api/users
+  route.get("/users/:id", getUser),    // GET /api/users/:id
+  route.post("/users", createUser),    // POST /api/users
+])
+```
 
+### With Middleware
+
+Apply middleware to all routes in a group:
+
+```typescript
+import { authenticate } from "@gello/auth"
+
+const authRoutes = Route.group({
+  prefix: "/api",
+  middleware: [authenticate()]
+}, [
+  route.get("/me", getCurrentUser),
+  route.get("/tokens", listTokens),
+  route.post("/tokens", createToken),
+])
+```
+
+### Nested Groups
+
+Groups can be nested for complex route hierarchies. Middleware is inherited from parent groups:
+
+```typescript
+const adminRoutes = Route.group({
+  prefix: "/admin",
+  middleware: [authenticate(), requireAdmin()]
+}, [
+  // /admin/users routes
+  Route.group({ prefix: "/users" }, [
+    route.get("/", listUsers),         // GET /admin/users
+    route.post("/", createUser),       // POST /admin/users
+    route.delete("/:id", deleteUser),  // DELETE /admin/users/:id
+  ]),
+
+  // /admin/posts routes
+  Route.group({ prefix: "/posts" }, [
+    route.get("/", listPosts),         // GET /admin/posts
+    route.delete("/:id", deletePost),  // DELETE /admin/posts/:id
+  ]),
+])
+```
+
+### Combining Groups
+
+Combine multiple route groups in your main routes file:
+
+```typescript
 // routes/index.ts
 export const routes = [
-  ...apiRoutes,
-  ...userRoutes,
-  ...postRoutes,
+  ...publicRoutes,
+  ...Route.group({ prefix: "/api", middleware: [authenticate()] }, [
+    ...userRoutes,
+    ...postRoutes,
+  ]),
+  ...adminRoutes,
 ] as const
 ```
 
+<Callout type="info">
+Middleware in route groups is applied in order: global middleware first, then group middleware (outer to inner), then route-specific middleware.
+</Callout>
+
 ## Middleware per Route
 
-Apply middleware to specific routes by wrapping handlers.
+Apply middleware to individual routes using the route's middleware property:
+
+```typescript
+export const routes = [
+  route.get("/public", publicHandler),
+  {
+    ...route.get("/me", getProfile),
+    middleware: [authenticate()]
+  },
+  {
+    ...route.post("/admin/users", createUser),
+    middleware: [authenticate(), requireAdmin()]
+  },
+] as const
+```
+
+Or wrap handlers directly for more control:
 
 ```typescript
 const withAuth = <R>(handler: Effect.Effect<HttpServerResponse, RouteError, R>) =>

@@ -11,7 +11,7 @@ export default defineConfig(() => ({
   plugins: [
     nxViteTsPaths(),
     nxCopyAssetsPlugin(['*.md']),
-    dts({ entryRoot: 'src', tsconfigPath: path.join(__dirname, 'tsconfig.lib.json') }),
+    dts({ entryRoot: 'src', tsconfigPath: path.join(__dirname, 'tsconfig.lib.json'), skipDiagnostics: true }),
   ],
   build: {
     outDir: './dist',

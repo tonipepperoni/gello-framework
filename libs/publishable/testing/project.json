@@ -5,6 +5,14 @@
   "projectType": "library",
   "tags": ["scope:public", "type:lib"],
   "targets": {
+    "version": {
+      "executor": "@jscutlery/semver:version",
+      "options": {
+        "preset": "angular",
+        "tagPrefix": "testing-v",
+        "postTargets": ["gello-testing:publish"]
+      }
+    },
     "publish": {
       "executor": "nx:run-commands",
       "dependsOn": ["build"],

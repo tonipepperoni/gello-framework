@@ -5,6 +5,14 @@
   "projectType": "library",
   "tags": ["publishable"],
   "targets": {
+    "version": {
+      "executor": "@jscutlery/semver:version",
+      "options": {
+        "preset": "angular",
+        "tagPrefix": "auth-v",
+        "postTargets": ["gello-auth:publish"]
+      }
+    },
     "build": {
       "executor": "@nx/esbuild:esbuild",
       "outputs": ["{options.outputPath}"],

@@ -31,6 +31,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.8.0",
+    "@jscutlery/semver": "^5.7.1",
     "@nx/esbuild": "20.8.3",
     "@nx/eslint": "20.8.3",
     "@nx/eslint-plugin": "20.8.3",

@@ -9,7 +9,7 @@
       "executor": "@nx/esbuild:esbuild",
       "outputs": ["{options.outputPath}"],
       "options": {
-        "outputPath": "tools/cli/dist",
+        "outputPath": "dist/tools/cli",
         "main": "tools/cli/src/main.tsx",
         "additionalEntryPoints": ["tools/cli/src/index.ts"],
         "tsConfig": "tools/cli/tsconfig.lib.json",
@@ -32,7 +32,7 @@
       "dependsOn": ["build"],
       "options": {
         "command": "npm publish --access public",
-        "cwd": "tools/cli/dist"
+        "cwd": "dist/tools/cli"
       }
     }
   }

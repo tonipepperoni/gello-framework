@@ -47,27 +47,27 @@ const StorageStatus: React.FC = () => {
   const [defaultDisk, setDefaultDisk] = useState<string>('local');
 
   useEffect(() => {
-    const env = process.env;
+    const env = process.env as Record<string, string | undefined>;
     const detected: DiskInfo[] = [];
 
     // Detect configured disks from environment
-    setDefaultDisk(env.FILESYSTEM_DISK ?? 'local');
+    setDefaultDisk(env['FILESYSTEM_DISK'] ?? 'local');
 
     // Local disk
     detected.push({
       name: 'local',
       driver: 'local',
       configured: true, // Always available as fallback
-      details: env.FILESYSTEM_LOCAL_ROOT ?? './storage',
+      details: env['FILESYSTEM_LOCAL_ROOT'] ?? './storage',
     });
 
     // S3 disk
-    if (env.AWS_BUCKET) {
+    if (env['AWS_BUCKET']) {
       detected.push({
         name: 's3',
         driver: 's3',
         configured: true,
-        details: `${env.AWS_BUCKET} (${env.AWS_DEFAULT_REGION ?? 'us-east-1'})`,
+        details: `${env['AWS_BUCKET']} (${env['AWS_DEFAULT_REGION'] ?? 'us-east-1'})`,
       });
     } else {
       detected.push({
@@ -79,12 +79,12 @@ const StorageStatus: React.FC = () => {
     }
 
     // Azure disk
-    if (env.AZURE_STORAGE_ACCOUNT) {
+    if (env['AZURE_STORAGE_ACCOUNT']) {
       detected.push({
         name: 'azure',
         driver: 'azure',
         configured: true,
-        details: `${env.AZURE_STORAGE_ACCOUNT}/${env.AZURE_STORAGE_CONTAINER ?? '(no container)'}`,
+        details: `${env['AZURE_STORAGE_ACCOUNT']}/${env['AZURE_STORAGE_CONTAINER'] ?? '(no container)'}`,
       });
     } else {
       detected.push({
@@ -96,12 +96,12 @@ const StorageStatus: React.FC = () => {
     }
 
     // GCS disk
-    if (env.GCS_PROJECT_ID) {
+    if (env['GCS_PROJECT_ID']) {
       detected.push({
         name: 'gcs',
         driver: 'gcs',
         configured: true,
-        details: `${env.GCS_PROJECT_ID}/${env.GCS_BUCKET ?? '(no bucket)'}`,
+        details: `${env['GCS_PROJECT_ID']}/${env['GCS_BUCKET'] ?? '(no bucket)'}`,
       });
     } else {
       detected.push({

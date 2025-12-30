@@ -417,6 +417,8 @@ importers:
 
   libs/mail/templates: {}
 
+  libs/openapi: {}
+
   libs/publishable/auth:
     dependencies:
       '@gello/auth-authorization':

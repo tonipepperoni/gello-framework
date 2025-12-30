@@ -57,6 +57,7 @@
       "@gello/mail-core": ["libs/mail/core/src/index.ts"],
       "@gello/mail-drivers": ["libs/mail/drivers/src/index.ts"],
       "@gello/mail-templates": ["libs/mail/templates/src/index.ts"],
+      "@gello/openapi": ["libs/openapi/src/index.ts"],
       "@gello/optics": ["libs/fp/optics/src/index.ts"],
       "@gello/platform-node": ["libs/publishable/platform-node/src/index.ts"],
       "@gello/queue": ["libs/publishable/queue/src/index.ts"],

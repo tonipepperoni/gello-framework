@@ -13,9 +13,10 @@
 import * as React from 'react';
 import { render, Box, Text } from 'ink';
 import { routeListCommand } from './commands/route-list.js';
-import { newCommand } from './commands/new.js';
+import { newCommand } from './commands/new/index.js';
 import { serveCommand } from './commands/serve.js';
 import { storageCommand, storageConfigCommand } from './commands/storage.js';
+import { generateOpenApiCommand, generateClientCommand } from './commands/openapi/index.js';
 
 // Gruvbox dark palette
 const gruvbox = {
@@ -130,6 +131,25 @@ const HelpScreen: React.FC<HelpScreenProps> = ({ version }) => (
           <Text color={gruvbox.green}>storage:config</Text>
         </Box>
         <Text color={gruvbox.gray}>Generate storage config module</Text>
+      </Box>
+
+      {/* OpenAPI */}
+      <Box marginLeft={2} marginTop={1}>
+        <Text color={gruvbox.aqua} bold>
+          OpenAPI
+        </Text>
+      </Box>
+      <Box marginLeft={4}>
+        <Box width={25}>
+          <Text color={gruvbox.green}>openapi:generate</Text>
+        </Box>
+        <Text color={gruvbox.gray}>Generate OpenAPI spec from routes</Text>
+      </Box>
+      <Box marginLeft={4}>
+        <Box width={25}>
+          <Text color={gruvbox.green}>client:generate</Text>
+        </Box>
+        <Text color={gruvbox.gray}>Generate TypeScript client</Text>
       </Box>
 
       {/* Generators */}
@@ -313,6 +333,19 @@ const main = async () => {
 
     case 'storage:config':
       await storageConfigCommand(options['output'] as string);
+      break;
+
+    case 'openapi:generate':
+      await generateOpenApiCommand({
+        output: options['output'] as string,
+      });
+      break;
+
+    case 'client:generate':
+      await generateClientCommand({
+        input: options['input'] as string,
+        output: options['output'] as string,
+      });
       break;
 
     default:

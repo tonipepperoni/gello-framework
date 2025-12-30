@@ -1,6 +1,6 @@
 import { Context, Effect, Duration, Ref, Fiber, Layer, HashMap } from "effect"
 import { QueueName } from "@gello/queue-core"
-import { Worker, WorkerConfig, WorkerStatus, makeWorker, defaultWorkerConfig } from "./Worker"
+import { Worker, WorkerConfig, WorkerStatus, makeWorker, defaultWorkerConfig } from "./Worker.ts"
 
 export interface QueueWorkerConfig extends Omit<WorkerConfig, "queue"> {
   readonly name: QueueName

@@ -1,6 +1,6 @@
 {
   "name": "@gello/common",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "Common utilities for Gello framework - middleware, routing, validation",
   "keywords": [
     "gello",

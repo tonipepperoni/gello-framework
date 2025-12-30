@@ -13,7 +13,7 @@ function HomePage() {
         {/* Logo - hidden on very small screens, show text instead */}
         <div className="mb-6 sm:mb-8">
           {/* ASCII art for larger screens */}
-          <pre className="hidden sm:block text-fd-primary text-xs sm:text-sm font-mono leading-none overflow-x-auto">
+          <pre className="hidden sm:block text-fd-primary text-xs sm:text-sm font-mono leading-none whitespace-pre">
 {` ██████╗ ███████╗██╗     ██╗      ██████╗
 ██╔════╝ ██╔════╝██║     ██║     ██╔═══██╗
 ██║  ███╗█████╗  ██║     ██║     ██║   ██║

@@ -1,0 +1,267 @@
+---
+title: OAuth
+description: Let users sign in with GitHub, Google, and other providers
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
+
+OAuth lets users sign in with their existing accounts from providers like GitHub or Google. Gello makes this simple.
+
+## Configuration
+
+Add your OAuth credentials to `.env`:
+
+```bash
+# GitHub
+GITHUB_CLIENT_ID=your-client-id
+GITHUB_CLIENT_SECRET=your-client-secret
+GITHUB_REDIRECT_URI=http://localhost:3000/auth/github/callback
+
+# Google
+GOOGLE_CLIENT_ID=your-client-id
+GOOGLE_CLIENT_SECRET=your-client-secret
+GOOGLE_REDIRECT_URI=http://localhost:3000/auth/google/callback
+```
+
+## Basic Flow
+
+OAuth has two steps: redirect to provider, then handle the callback.
+
+### Step 1: Redirect to Provider
+
+```typescript
+import { Social } from "@gello/auth"
+
+const githubLogin = Effect.gen(function* () {
+  const url = yield* Social.driver("github").redirect()
+  return redirect(url)
+})
+
+route.get("/auth/github", githubLogin)
+```
+
+### Step 2: Handle Callback
+
+```typescript
+const githubCallback = Effect.gen(function* () {
+  const code = yield* getQuery("code")
+  const state = yield* getQuery("state")
+
+  // Exchange code for user info
+  const socialUser = yield* Social.driver("github").user(code, state)
+
+  // socialUser contains:
+  // - id: Provider's user ID
+  // - email: User's email
+  // - name: User's name
+  // - avatar: Profile picture URL
+
+  // Find or create user in your database
+  let user = yield* UserRepo.findByEmail(socialUser.email)
+
+  if (!user) {
+    user = yield* UserRepo.create({
+      email: socialUser.email,
+      name: socialUser.name,
+      avatar: socialUser.avatar,
+      githubId: socialUser.id,
+    })
+  }
+
+  // Create session or token
+  const token = yield* Auth.createToken(user)
+
+  return json({ token })
+})
+
+route.get("/auth/github/callback", githubCallback)
+```
+
+## Providers
+
+### GitHub
+
+```typescript
+const url = yield* Social.driver("github")
+  .scopes(["user:email", "read:user"])
+  .redirect()
+```
+
+Available scopes: `user`, `user:email`, `read:user`, `repo`, etc.
+
+### Google
+
+```typescript
+const url = yield* Social.driver("google")
+  .scopes(["email", "profile"])
+  .redirect()
+```
+
+Available scopes: `email`, `profile`, `openid`, etc.
+
+## Requesting Scopes
+
+Request additional permissions from the provider:
+
+```typescript
+const url = yield* Social.driver("github")
+  .scopes(["user:email", "repo"])
+  .redirect()
+```
+
+## Social User Data
+
+The user object returned from providers includes:
+
+```typescript
+interface SocialUser {
+  id: string           // Provider's unique ID
+  email: string        // User's email
+  name: string         // Display name
+  avatar?: string      // Profile picture URL
+  token: {
+    accessToken: string
+    refreshToken?: string
+    expiresAt?: Date
+  }
+  raw: Record<string, unknown>  // Full provider response
+}
+```
+
+## Stateless OAuth
+
+For SPAs or mobile apps, you might want stateless OAuth without server-side sessions:
+
+```typescript
+const url = yield* Social.driver("github")
+  .stateless()
+  .redirect()
+
+// In callback, skip state verification
+const socialUser = yield* Social.driver("github")
+  .stateless()
+  .user(code)
+```
+
+<Callout type="warning">
+Stateless OAuth skips CSRF protection. Only use this for trusted clients.
+</Callout>
+
+## Linking Multiple Providers
+
+Let users connect multiple social accounts:
+
+```typescript
+const linkGithub = Effect.gen(function* () {
+  // User must be logged in
+  const user = yield* Auth.user()
+
+  const code = yield* getQuery("code")
+  const socialUser = yield* Social.driver("github").user(code)
+
+  // Link to existing account
+  yield* UserRepo.update(user.id, {
+    githubId: socialUser.id,
+  })
+
+  return json({ message: "GitHub linked successfully" })
+})
+```
+
+## Error Handling
+
+OAuth can fail for various reasons:
+
+```typescript
+import { OAuthError, OAuthStateMismatchError } from "@gello/auth"
+
+const callback = Effect.gen(function* () {
+  const socialUser = yield* Social.driver("github").user(code, state)
+  // ...
+}).pipe(
+  Effect.catchTags({
+    OAuthStateMismatchError: () =>
+      Effect.succeed(badRequest({ error: "Invalid state. Please try again." })),
+
+    OAuthError: (error) =>
+      Effect.succeed(badRequest({ error: error.message })),
+  })
+)
+```
+
+## Custom Providers
+
+Add your own OAuth provider:
+
+```typescript
+import { AbstractProvider } from "@gello/auth"
+
+class DiscordProvider extends AbstractProvider {
+  name = "discord"
+
+  getAuthorizationUrl(state: string): string {
+    const params = new URLSearchParams({
+      client_id: this.config.clientId,
+      redirect_uri: this.config.redirectUri,
+      response_type: "code",
+      scope: this.scopes.join(" "),
+      state,
+    })
+    return `https://discord.com/oauth2/authorize?${params}`
+  }
+
+  protected async exchangeCode(code: string) {
+    // Exchange code for access token
+  }
+
+  protected async fetchUser(token: string) {
+    // Fetch user profile with token
+  }
+}
+```
+
+## Complete Example
+
+Here's a full OAuth implementation:
+
+```typescript
+import { Social } from "@gello/auth"
+import { Route, route, redirect, json } from "@gello/platform-node"
+
+const authRoutes = Route.group({ prefix: "/auth" }, [
+  // GitHub
+  route.get("/github", Effect.gen(function* () {
+    const url = yield* Social.driver("github").redirect()
+    return redirect(url)
+  })),
+
+  route.get("/github/callback", Effect.gen(function* () {
+    const code = yield* getQuery("code")
+    const state = yield* getQuery("state")
+
+    const socialUser = yield* Social.driver("github").user(code, state)
+    const user = yield* findOrCreateUser(socialUser, "github")
+    const token = yield* Auth.createToken(user)
+
+    return json({ token, user })
+  })),
+
+  // Google
+  route.get("/google", Effect.gen(function* () {
+    const url = yield* Social.driver("google").redirect()
+    return redirect(url)
+  })),
+
+  route.get("/google/callback", Effect.gen(function* () {
+    const code = yield* getQuery("code")
+    const state = yield* getQuery("state")
+
+    const socialUser = yield* Social.driver("google").user(code, state)
+    const user = yield* findOrCreateUser(socialUser, "google")
+    const token = yield* Auth.createToken(user)
+
+    return json({ token, user })
+  })),
+])
+```

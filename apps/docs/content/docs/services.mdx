@@ -1,0 +1,302 @@
+---
+title: Services & Layers
+description: Create and provide dependencies in your Gello app
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+Services are how Gello manages dependencies. Instead of importing things directly, you ask for what you need and Gello provides it at runtime.
+
+## Why Services?
+
+Services give you:
+- **Testability** — Swap real implementations for mocks
+- **Flexibility** — Change implementations without changing code
+- **Type Safety** — The compiler knows what dependencies you need
+
+## Using Services
+
+Most of the time, you just use the services Gello provides:
+
+```typescript
+import { Effect } from "effect"
+import { Config, Cache, Queue } from "@gello/core"
+
+const handler = Effect.gen(function* () {
+  // Get configuration
+  const config = yield* Config
+  const apiKey = yield* config.string("API_KEY")
+
+  // Use cache
+  const cache = yield* Cache
+  const cached = yield* cache.get("my-key")
+
+  // Dispatch a job
+  const queue = yield* Queue
+  yield* queue.push(MyJob, { data: "..." })
+})
+```
+
+## Creating Your Own Services
+
+When you need to share logic across handlers, create a service.
+
+### Step 1: Define the Interface
+
+```typescript
+import { Context, Effect } from "effect"
+
+// What the service can do
+interface UserRepo {
+  findById(id: string): Effect.Effect<User | null>
+  findByEmail(email: string): Effect.Effect<User | null>
+  create(data: CreateUserData): Effect.Effect<User>
+  update(id: string, data: UpdateUserData): Effect.Effect<User>
+  delete(id: string): Effect.Effect<void>
+}
+
+// Create a tag for the service
+class UserRepo extends Context.Tag("UserRepo")<UserRepo, UserRepo>() {}
+```
+
+### Step 2: Implement the Service
+
+```typescript
+import { Effect, Layer } from "effect"
+
+const UserRepoLive = Layer.effect(
+  UserRepo,
+  Effect.gen(function* () {
+    // Get dependencies this service needs
+    const db = yield* Database
+
+    // Return the implementation
+    return {
+      findById: (id) => Effect.tryPromise(() =>
+        db.query("SELECT * FROM users WHERE id = ?", [id])
+      ),
+
+      findByEmail: (email) => Effect.tryPromise(() =>
+        db.query("SELECT * FROM users WHERE email = ?", [email])
+      ),
+
+      create: (data) => Effect.tryPromise(() =>
+        db.query("INSERT INTO users ...", [data.email, data.name])
+      ),
+
+      update: (id, data) => Effect.tryPromise(() =>
+        db.query("UPDATE users SET ... WHERE id = ?", [...Object.values(data), id])
+      ),
+
+      delete: (id) => Effect.tryPromise(() =>
+        db.query("DELETE FROM users WHERE id = ?", [id])
+      ),
+    }
+  })
+)
+```
+
+### Step 3: Use the Service
+
+```typescript
+const getUser = Effect.gen(function* () {
+  const userRepo = yield* UserRepo
+  const id = yield* getParam("id")
+
+  const user = yield* userRepo.findById(id)
+
+  if (!user) {
+    return notFound({ error: "User not found" })
+  }
+
+  return json(user)
+})
+```
+
+### Step 4: Provide the Layer
+
+```typescript
+import { Layer } from "effect"
+
+const AppLayer = Layer.mergeAll(
+  ConfigLive,
+  DatabaseLive,
+  UserRepoLive,  // Add your service
+)
+
+runApp(app, AppLayer)
+```
+
+## Layer Composition
+
+Layers can depend on other layers:
+
+```typescript
+// Database needs Config
+const DatabaseLive = Layer.effect(
+  Database,
+  Effect.gen(function* () {
+    const config = yield* Config
+    const url = yield* config.string("DATABASE_URL")
+    return createPool(url)
+  })
+)
+
+// UserRepo needs Database
+const UserRepoLive = Layer.effect(
+  UserRepo,
+  Effect.gen(function* () {
+    const db = yield* Database
+    return { /* implementation */ }
+  })
+)
+
+// Compose them
+const AppLayer = Layer.mergeAll(
+  ConfigLive,
+  DatabaseLive,
+  UserRepoLive,
+)
+```
+
+Gello figures out the order automatically — Database is created before UserRepo.
+
+## Simple Services
+
+For services without dependencies, use `Layer.succeed`:
+
+```typescript
+const IdGenerator = Context.Tag<IdGenerator>()("IdGenerator")
+
+const IdGeneratorLive = Layer.succeed(IdGenerator, {
+  generate: () => crypto.randomUUID(),
+})
+```
+
+## Scoped Services
+
+For services that need cleanup (like database connections), use `Layer.scoped`:
+
+```typescript
+const DatabaseLive = Layer.scoped(
+  Database,
+  Effect.gen(function* () {
+    const config = yield* Config
+    const url = yield* config.string("DATABASE_URL")
+
+    // Create pool
+    const pool = yield* Effect.acquireRelease(
+      Effect.sync(() => createPool(url)),
+      (pool) => Effect.sync(() => pool.end())
+    )
+
+    return pool
+  })
+)
+```
+
+The pool is automatically closed when the app shuts down.
+
+## Testing with Mocks
+
+Create mock implementations for testing:
+
+```typescript
+const MockUserRepo = Layer.succeed(UserRepo, {
+  findById: (id) => Effect.succeed(
+    id === "1" ? { id: "1", name: "Alice" } : null
+  ),
+
+  findByEmail: (email) => Effect.succeed(
+    email === "alice@example.com" ? { id: "1", name: "Alice" } : null
+  ),
+
+  create: (data) => Effect.succeed({
+    id: "new-id",
+    ...data,
+  }),
+
+  update: (id, data) => Effect.succeed({
+    id,
+    name: data.name ?? "Alice",
+  }),
+
+  delete: () => Effect.void,
+})
+
+// Use in tests
+const TestLayer = Layer.mergeAll(
+  MockUserRepo,
+  MockCache,
+  ConfigTest,
+)
+```
+
+## Common Patterns
+
+### Factory Functions
+
+When you need to create service instances dynamically:
+
+```typescript
+const makeUserRepo = (db: Database): UserRepo => ({
+  findById: (id) => Effect.tryPromise(() =>
+    db.query("SELECT * FROM users WHERE id = ?", [id])
+  ),
+  // ...
+})
+
+const UserRepoLive = Layer.effect(
+  UserRepo,
+  Effect.gen(function* () {
+    const db = yield* Database
+    return makeUserRepo(db)
+  })
+)
+```
+
+### Multiple Implementations
+
+Swap implementations based on environment:
+
+```typescript
+const UserRepoLive = process.env.NODE_ENV === "test"
+  ? MockUserRepo
+  : PostgresUserRepo
+```
+
+Or use configuration:
+
+```typescript
+const StorageLive = Layer.effect(
+  Storage,
+  Effect.gen(function* () {
+    const config = yield* Config
+    const driver = yield* config.string("STORAGE_DRIVER")
+
+    switch (driver) {
+      case "s3":
+        return yield* makeS3Storage()
+      case "local":
+        return yield* makeLocalStorage()
+      default:
+        return yield* makeMemoryStorage()
+    }
+  })
+)
+```
+
+## Quick Reference
+
+| Function | Use Case |
+|----------|----------|
+| `Context.Tag` | Define a service identifier |
+| `Layer.effect` | Service with dependencies |
+| `Layer.succeed` | Simple service, no dependencies |
+| `Layer.scoped` | Service with cleanup |
+| `Layer.mergeAll` | Combine multiple layers |
+| `Layer.provide` | Give a layer its dependencies |
+
+<Callout type="info">
+For more on Effect's dependency system, see the [Effect documentation on Services](https://effect.website/docs/guides/context-management/services).
+</Callout>

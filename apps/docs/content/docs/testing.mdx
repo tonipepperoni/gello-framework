@@ -1,0 +1,344 @@
+---
+title: Testing
+description: Write tests for your Gello application
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
+
+Gello is built for testability. Services can be swapped for mocks, and effects can be run in isolation.
+
+## Setup
+
+Gello works with [Vitest](https://vitest.dev/). Your project comes pre-configured:
+
+```bash
+# Run all tests
+pnpm test
+
+# Run tests in watch mode
+pnpm test:watch
+
+# Run with coverage
+pnpm test:coverage
+```
+
+## Testing Handlers
+
+Test your route handlers directly:
+
+```typescript
+import { describe, it, expect } from "vitest"
+import { Effect } from "effect"
+import { runEffect } from "@gello/testing"
+
+describe("getUser", () => {
+  it("returns a user by id", async () => {
+    const result = await runEffect(
+      getUser,
+      TestLayer
+    )
+
+    expect(result.status).toBe(200)
+    expect(result.body).toMatchObject({
+      id: "123",
+      name: "Alice",
+    })
+  })
+})
+```
+
+### Providing Context
+
+Handlers need request context. Use the test helpers:
+
+```typescript
+import { withRouteParams, withJsonBody } from "@gello/testing"
+
+it("creates a user", async () => {
+  const handler = createUser.pipe(
+    withJsonBody({ name: "Alice", email: "alice@example.com" })
+  )
+
+  const result = await runEffect(handler, TestLayer)
+
+  expect(result.status).toBe(201)
+})
+
+it("gets a user by id", async () => {
+  const handler = getUser.pipe(
+    withRouteParams({ id: "123" })
+  )
+
+  const result = await runEffect(handler, TestLayer)
+
+  expect(result.status).toBe(200)
+})
+```
+
+## HTTP Tests
+
+Test your full API with the test client:
+
+```typescript
+import { createTestClient } from "@gello/testing"
+
+describe("Users API", () => {
+  const client = createTestClient(app)
+
+  it("lists users", async () => {
+    const response = await client.get("/users")
+
+    expect(response.status).toBe(200)
+    expect(response.json()).toHaveLength(2)
+  })
+
+  it("creates a user", async () => {
+    const response = await client.post("/users", {
+      json: { name: "Alice", email: "alice@example.com" },
+    })
+
+    expect(response.status).toBe(201)
+    expect(response.json()).toMatchObject({
+      name: "Alice",
+    })
+  })
+})
+```
+
+### Headers and Auth
+
+Set headers on requests:
+
+```typescript
+const response = await client.get("/me", {
+  headers: {
+    Authorization: "Bearer test-token",
+  },
+})
+```
+
+## Mocking Services
+
+Replace real services with mocks for isolated testing:
+
+```typescript
+import { Layer } from "effect"
+import { MockUserRepo, MockCache } from "@gello/testing"
+
+const TestLayer = Layer.mergeAll(
+  MockUserRepo,
+  MockCache,
+  ConfigTest,
+)
+
+// Use in tests
+await runEffect(handler, TestLayer)
+```
+
+### Custom Mocks
+
+Create mocks for your own services:
+
+```typescript
+import { Layer } from "effect"
+
+const MockPaymentService = Layer.succeed(PaymentService, {
+  charge: (amount, card) => Effect.succeed({
+    id: "mock-charge-id",
+    amount,
+    status: "succeeded",
+  }),
+
+  refund: (chargeId) => Effect.succeed({
+    id: "mock-refund-id",
+    status: "refunded",
+  }),
+})
+```
+
+## Testing Authentication
+
+Test authenticated routes with `actingAs`:
+
+```typescript
+import { actingAs, actingAsLayer } from "@gello/auth/testing"
+
+it("returns current user", async () => {
+  const user = { id: "123", name: "Alice", email: "alice@example.com" }
+
+  const result = await runEffect(
+    getCurrentUser,
+    TestLayer.pipe(Layer.provide(actingAsLayer(user)))
+  )
+
+  expect(result.body).toMatchObject({ name: "Alice" })
+})
+```
+
+### With Token Scopes
+
+```typescript
+const result = await runEffect(
+  handler,
+  actingAsLayer(user, ["posts:read", "posts:write"])
+)
+```
+
+## Testing Authorization
+
+Assert on permissions:
+
+```typescript
+import { assertCan, assertCannot } from "@gello/auth/testing"
+
+it("allows owner to edit post", async () => {
+  const user = { id: "1", role: "user" }
+  const post = { id: "1", authorId: "1" }
+
+  await assertCan(user, "update", post)
+})
+
+it("denies others from editing", async () => {
+  const user = { id: "2", role: "user" }
+  const post = { id: "1", authorId: "1" }
+
+  await assertCannot(user, "update", post)
+})
+```
+
+## Testing Queues
+
+Test that jobs are dispatched:
+
+```typescript
+import { MockQueue, assertDispatched } from "@gello/testing"
+
+it("queues welcome email", async () => {
+  await runEffect(registerUser(data), TestLayer)
+
+  assertDispatched(MockQueue, WelcomeEmailJob, {
+    userId: "123",
+  })
+})
+```
+
+### Process Jobs Immediately
+
+Run queued jobs synchronously in tests:
+
+```typescript
+const SyncQueueLayer = Layer.provide(
+  QueueDriverLive,
+  SyncDriver
+)
+
+// Jobs run immediately instead of being queued
+await runEffect(handler, SyncQueueLayer)
+```
+
+## Testing Mail
+
+Capture sent emails:
+
+```typescript
+import { MockMailer, assertMailSent } from "@gello/testing"
+
+it("sends verification email", async () => {
+  await runEffect(registerUser(data), TestLayer)
+
+  assertMailSent(MockMailer, {
+    to: "alice@example.com",
+    subject: "Verify your email",
+  })
+})
+```
+
+## Assertions
+
+Gello provides test assertions:
+
+```typescript
+import {
+  expectSuccess,
+  expectFailure,
+  expectStatus,
+  expectJson,
+} from "@gello/testing"
+
+// Effect assertions
+await expectSuccess(effect)
+await expectFailure(effect, "ValidationError")
+
+// HTTP assertions
+expectStatus(response, 200)
+expectJson(response, { name: "Alice" })
+```
+
+## Database Testing
+
+Use transactions for test isolation:
+
+```typescript
+import { withTestTransaction } from "@gello/testing"
+
+describe("UserRepo", () => {
+  it("creates a user", async () => {
+    await withTestTransaction(async () => {
+      const user = await UserRepo.create({ name: "Alice" })
+      const found = await UserRepo.find(user.id)
+
+      expect(found.name).toBe("Alice")
+    })
+    // Transaction is rolled back — database is clean
+  })
+})
+```
+
+## Tips
+
+### Keep Tests Fast
+
+- Use mocks instead of real services when possible
+- Avoid network calls in unit tests
+- Use in-memory drivers for queues and cache
+
+### Test Behavior, Not Implementation
+
+```typescript
+// Good — tests behavior
+it("returns 404 when user not found", async () => {
+  const response = await client.get("/users/999")
+  expect(response.status).toBe(404)
+})
+
+// Less useful — tests implementation details
+it("calls UserRepo.find with correct id", async () => {
+  // ...
+})
+```
+
+### Use Test Layers
+
+Create reusable test layers:
+
+```typescript
+// test/layers.ts
+export const TestLayer = Layer.mergeAll(
+  MockUserRepo,
+  MockCache,
+  MockQueue,
+  ConfigTest,
+)
+
+export const IntegrationTestLayer = Layer.mergeAll(
+  UserRepoLive,
+  RedisCacheLive,
+  MemoryQueueLive,
+  ConfigTest,
+)
+```
+
+<Callout type="info">
+See `@gello/testing` for the full list of test utilities and mocks.
+</Callout>

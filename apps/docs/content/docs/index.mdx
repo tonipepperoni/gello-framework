@@ -1,136 +1,48 @@
 ---
 title: Introduction
-description: Gello — A TypeScript backend framework built on Effect, inspired by Laravel, Rails, and NestJS
+description: Gello is a TypeScript backend framework with the developer experience of Laravel and full type safety.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Card, Cards } from 'fumadocs-ui/components/card';
 import { Step, Steps } from 'fumadocs-ui/components/steps';
 
-Gello is a sophisticated backend framework that combines the best ideas from established frameworks with Effect's functional programming paradigm:
+Gello is a backend framework for TypeScript that gives you the developer experience you love from Laravel — elegant APIs, sensible defaults, and a powerful CLI — with complete type safety powered by [Effect](https://effect.website).
 
-- **Laravel's Developer Experience** — Elegant APIs, powerful CLI, sensible defaults
-- **Ruby on Rails' Philosophy** — Convention over configuration, developer productivity
-- **NestJS's Modularity** — Service-oriented architecture, clean dependency injection
-- **Effect's Type Safety** — Functional programming, compile-time error handling
+## Why Gello?
 
-Built on [Effect](https://effect.website) and [@effect/platform](https://github.com/Effect-TS/effect/tree/main/packages/platform), Gello follows the principle: **program = value, interpret at the edge**.
-
-## Architecture Overview
-
-```mermaid
-flowchart TB
-    subgraph Edge["Edge (Runtime)"]
-        HTTP[HTTP Server]
-        CLI[CLI Commands]
-        Worker[Queue Workers]
-    end
-
-    subgraph App["Application Layer"]
-        Router[Router & Middleware]
-        Handlers[Route Handlers]
-        Jobs[Job Handlers]
-    end
-
-    subgraph Services["Service Layer"]
-        UserSvc[UserService]
-        CacheSvc[CacheService]
-        QueueSvc[QueueService]
-    end
-
-    subgraph Infra["Infrastructure Layer"]
-        DB[(Database)]
-        Redis[(Redis)]
-        FS[File System]
-    end
-
-    HTTP --> Router
-    CLI --> Handlers
-    Worker --> Jobs
-
-    Router --> Handlers
-    Handlers --> UserSvc
-    Handlers --> CacheSvc
-    Jobs --> QueueSvc
-
-    UserSvc --> DB
-    CacheSvc --> Redis
-    QueueSvc --> Redis
-```
-
-## Core Philosophy
-
-<Callout type="info" title="The Gello Way">
-Build applications as pure values, compose them with Layers, and interpret at the edge.
-No magic, no hidden state, just functions and types.
-</Callout>
-
-- **No Module Abstraction**: Just compose Layers for dependencies and handlers that `yield*` from context
-- **Scoped Resources**: Database pools, Redis connections — all managed with `Layer.scoped` and `acquireRelease`
-- **Typed Boundaries**: Use `@effect/schema` for request/response validation at the edge
-- **Single Composition Point**: All layers merge at one root, then `Layer.launch`
+- **Type-Safe Everything** — Errors, dependencies, and responses are all checked at compile time
+- **Familiar Patterns** — If you've used Laravel, Rails, or NestJS, you'll feel right at home
+- **No Magic** — Clear, explicit code that's easy to understand and debug
+- **Batteries Included** — Authentication, queues, mail, caching, storage — all built in
 
 ## Quick Example
 
+Here's a simple API that returns a list of users:
+
 ```typescript
-import { Context, Effect, Layer, pipe } from "effect"
-import * as S from "@effect/schema/Schema"
-import * as HttpRouter from "@effect/platform/HttpRouter"
-import * as HttpServer from "@effect/platform/HttpServer"
-import * as HttpServerResponse from "@effect/platform/HttpServerResponse"
-import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer"
-import * as NodeRuntime from "@effect/platform-node/NodeRuntime"
-import { createServer } from "node:http"
+import { createApp, route, json } from "@gello/platform-node"
+import { Effect } from "effect"
 
-// 1) Define a service with Context.Tag
-class UserRepo extends Context.Tag("UserRepo")<
-  UserRepo,
-  { getAll: () => Effect.Effect<User[]> }
->() {}
+const getUsers = Effect.gen(function* () {
+  const users = [
+    { id: 1, name: "Alice" },
+    { id: 2, name: "Bob" },
+  ]
+  return json(users)
+})
 
-// 2) Implement as a Layer
-const UserRepoLive = Layer.effect(
-  UserRepo,
-  Effect.gen(function* () {
-    const db = yield* Db
-    return {
-      getAll: () => Effect.tryPromise(() => db.select().from(users))
-    }
-  })
-).pipe(Layer.provide(DbLive))
+const app = createApp({ port: 3000 })
+  .routes([
+    route.get("/users", getUsers),
+  ])
 
-// 3) Build routes that yield* dependencies
-const AppRouter = pipe(
-  HttpRouter.empty,
-  HttpRouter.get("/users", Effect.gen(function* () {
-    const repo = yield* UserRepo
-    const users = yield* repo.getAll()
-    return yield* HttpServerResponse.schemaJson(S.Array(User))(users)
-  }))
-)
-
-// 4) Compose all layers at the edge
-const AppLayer = Layer.mergeAll(ConfigLive, DbLive, UserRepoLive)
-
-const MainLayer = pipe(
-  HttpServer.serve(HttpRouter.toHttpApp(AppRouter)),
-  Layer.provide(AppLayer),
-  Layer.provide(NodeHttpServer.layer(createServer, { port: 3000 }))
-)
-
-Layer.launch(MainLayer).pipe(NodeRuntime.runMain)
+app.run()
 ```
 
-## What This Gives You
+That's it. No decorators, no classes, no configuration files. Just functions.
 
-<Cards>
-  <Card title="Resource Safety" description="Pools close on shutdown, connections release properly" />
-  <Card title="Testability" description="Swap any Layer for a mock — no DI container ceremony" />
-  <Card title="Type Inference" description="The compiler knows exactly what dependencies each handler needs" />
-  <Card title="No Magic" description="It's just functions and values, all the way down" />
-</Cards>
-
-## Quick Start
+## Getting Started
 
 <Steps>
 <Step>
@@ -149,30 +61,47 @@ pnpm install
 ```
 </Step>
 <Step>
-### Start development server
+### Start the development server
 
 ```bash
 pnpm dev
 ```
+
+Your API is now running at `http://localhost:3000`.
 </Step>
 </Steps>
 
+## What You Get
+
+<Cards>
+  <Card title="Routing" href="/docs/routing" description="Define API endpoints with a simple, expressive syntax" />
+  <Card title="Authentication" href="/docs/authentication" description="Token-based and session auth out of the box" />
+  <Card title="Queues" href="/docs/queues" description="Background jobs with Redis, database, or in-memory drivers" />
+  <Card title="Mail" href="/docs/mail" description="Send emails with templates using React components" />
+  <Card title="Caching" href="/docs/caching" description="Speed up your app with Redis or in-memory caching" />
+  <Card title="Storage" href="/docs/storage" description="Store files locally or in S3, Azure, or GCS" />
+</Cards>
+
 ## Packages
 
-Gello is organized into focused packages:
+Gello is organized into focused packages that you can use together or individually:
 
 | Package | Description |
 |---------|-------------|
-| `@gello/core` | Core contracts, errors, and base types |
-| `@gello/common` | Middleware, routing, validation utilities |
-| `@gello/platform-node` | Node.js HTTP adapter |
-| `@gello/queue` | Effect-native queue system |
-| `@gello/auth` | Authentication, authorization, and OAuth |
-| `@gello/fp` | Optics, refined types, FP utilities |
-| `@gello/testing` | Testing utilities and mocks |
+| `@gello/core` | Base types and error handling |
+| `@gello/common` | Middleware, routing, and validation |
+| `@gello/platform-node` | Node.js HTTP server |
+| `@gello/queue` | Background job processing |
+| `@gello/auth` | Authentication and authorization |
+| `@gello/fp` | Functional programming utilities |
+| `@gello/testing` | Test helpers and mocks |
 
 ## Requirements
 
-- **Node.js** 20.0+
-- **TypeScript** 5.4+
-- **Effect** 3.x
+- **Node.js** 20.0 or higher
+- **TypeScript** 5.4 or higher
+- **pnpm** (recommended) or npm
+
+<Callout type="info" title="New to Effect?">
+Don't worry if you haven't used Effect before. Gello handles most of the complexity for you, and we have an [Effect Primer](/docs/effect-primer) that covers just what you need to know.
+</Callout>

@@ -1,0 +1,204 @@
+---
+title: Responses
+description: Returning data from your handlers
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
+
+Every route handler must return an HTTP response. Gello provides helpers for common response types, or you can build responses manually.
+
+## JSON Responses
+
+The most common response type for APIs:
+
+```typescript
+import { json } from "@gello/platform-node"
+
+const getUser = Effect.gen(function* () {
+  const user = { id: 1, name: "Alice" }
+  return json(user)
+})
+```
+
+This returns:
+- Status: `200 OK`
+- Content-Type: `application/json`
+- Body: `{"id":1,"name":"Alice"}`
+
+## Status Code Helpers
+
+Gello provides helpers for common HTTP status codes:
+
+### Success Responses
+
+```typescript
+import {
+  json,        // 200 OK
+  created,     // 201 Created
+  accepted,    // 202 Accepted
+  noContent,   // 204 No Content
+} from "@gello/platform-node"
+
+// Return data
+return json(user)              // 200 with JSON
+return created(user)           // 201 with JSON
+
+// No body
+return accepted()              // 202
+return noContent()             // 204
+```
+
+### Error Responses
+
+```typescript
+import {
+  badRequest,      // 400
+  unauthorized,    // 401
+  forbidden,       // 403
+  notFound,        // 404
+  internalError,   // 500
+} from "@gello/platform-node"
+
+// With error details
+return badRequest({ error: "Invalid email format" })
+return unauthorized({ error: "Please log in" })
+return forbidden({ error: "You don't have permission" })
+return notFound({ error: "User not found" })
+return internalError({ error: "Something went wrong" })
+
+// Simple message
+return notFound("User not found")
+```
+
+## Redirects
+
+Redirect the client to another URL:
+
+```typescript
+import { redirect } from "@gello/platform-node"
+
+const oldEndpoint = Effect.gen(function* () {
+  return redirect("/api/v2/users")           // 302 Found
+  return redirect("/login", { status: 301 }) // 301 Permanent
+})
+```
+
+## Text and HTML
+
+Return plain text or HTML:
+
+```typescript
+import { text, html } from "@gello/platform-node"
+
+const healthCheck = Effect.gen(function* () {
+  return text("OK")
+})
+
+const homePage = Effect.gen(function* () {
+  return html("<h1>Welcome</h1>")
+})
+```
+
+## Custom Headers
+
+Add headers to any response:
+
+```typescript
+import { json } from "@gello/platform-node"
+import { HttpServerResponse } from "@effect/platform"
+
+const handler = Effect.gen(function* () {
+  return json(data).pipe(
+    HttpServerResponse.setHeader("X-Request-Id", "abc123"),
+    HttpServerResponse.setHeader("Cache-Control", "max-age=3600"),
+  )
+})
+```
+
+## Custom Status Codes
+
+Set any status code:
+
+```typescript
+import { HttpServerResponse } from "@effect/platform"
+
+const teapot = Effect.gen(function* () {
+  return HttpServerResponse.json({ message: "I'm a teapot" }, {
+    status: 418
+  })
+})
+```
+
+## Pagination
+
+For paginated lists, use the pagination helper:
+
+```typescript
+import { paginated } from "@gello/platform-node"
+
+const listUsers = Effect.gen(function* () {
+  const page = yield* getQueryAsNumber("page", 1)
+  const limit = yield* getQueryAsNumber("limit", 20)
+
+  const users = yield* userRepo.paginate({ page, limit })
+
+  return paginated(users.data, {
+    page: users.page,
+    limit: users.limit,
+    total: users.total,
+  })
+})
+```
+
+Returns:
+```json
+{
+  "data": [...],
+  "meta": {
+    "page": 1,
+    "limit": 20,
+    "total": 100,
+    "totalPages": 5
+  }
+}
+```
+
+## File Downloads
+
+Send a file as a download:
+
+```typescript
+import { download, stream } from "@gello/storage"
+
+const downloadReport = Effect.gen(function* () {
+  const file = yield* Storage.get("reports/monthly.pdf")
+
+  // Force download with filename
+  return download(file, "report.pdf")
+
+  // Or stream inline (opens in browser)
+  return stream(file, "application/pdf")
+})
+```
+
+## Quick Reference
+
+| Helper | Status | Use Case |
+|--------|--------|----------|
+| `json(data)` | 200 | Return JSON data |
+| `text(str)` | 200 | Return plain text |
+| `html(str)` | 200 | Return HTML |
+| `created(data)` | 201 | Resource created |
+| `accepted()` | 202 | Accepted for processing |
+| `noContent()` | 204 | Success, no body |
+| `redirect(url)` | 302 | Redirect client |
+| `badRequest(err)` | 400 | Validation errors |
+| `unauthorized(err)` | 401 | Not authenticated |
+| `forbidden(err)` | 403 | Not authorized |
+| `notFound(err)` | 404 | Resource not found |
+| `internalError(err)` | 500 | Server error |
+
+<Callout type="info">
+All response helpers return an `HttpServerResponse` that can be further customized with headers, cookies, or other modifications.
+</Callout>

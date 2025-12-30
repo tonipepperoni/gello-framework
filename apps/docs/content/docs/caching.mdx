@@ -1,297 +1,237 @@
 ---
 title: Caching
-description: Laravel-inspired caching with Effect — hexagonal architecture, multiple drivers, and type-safe operations
+description: Speed up your app by storing data for quick retrieval
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
 
-## The Pattern
+Caching stores frequently accessed data so you don't have to compute or fetch it repeatedly. Gello provides a simple, Laravel-inspired caching API.
 
-Gello's cache system follows hexagonal architecture. The core defines ports (interfaces) while
-drivers implement adapters. Use `Context.Tag` for dependency injection and swap
-implementations via Layers. Built-in drivers include memory, file, Redis, database, and multi-level
-L1/L2 caching.
-
-## Quick Start
+## Basic Usage
 
 ```typescript
+import { Cache } from "@gello/core"
 import { Effect } from "effect"
-import { Cache, makeCacheLayer } from "@gello/cache"
-import { makeMemoryStore } from "@gello/cache-drivers"
-import { minutes } from "@gello/time"
 
-// Create a cache layer
-const CacheLive = makeCacheLayer(
-  Effect.runSync(makeMemoryStore({ maxSize: 1000 }))
-)
-
-// Use the cache
-const program = Effect.gen(function* () {
+const handler = Effect.gen(function* () {
   const cache = yield* Cache
 
   // Store a value for 30 minutes
-  yield* cache.put("user:1", { name: "John" }, minutes(30))
+  yield* cache.put("user:1", { name: "Alice" }, "30 minutes")
 
-  // Retrieve it
-  const user = yield* cache.get<{ name: string }>("user:1")
-  // user: Option<{ name: string }>
-})
+  // Get a value (returns Option)
+  const user = yield* cache.get("user:1")
 
-Effect.runPromise(program.pipe(Effect.provide(CacheLive)))
-```
-
-## Cache Operations
-
-```typescript
-import { hours, minutes } from "@gello/time"
-
-Effect.gen(function* () {
-  const cache = yield* Cache
-
-  // Basic get/put
-  yield* cache.put("key", value)
-  yield* cache.put("key", value, hours(1))  // with TTL
-  const result = yield* cache.get<T>("key") // Option<T>
-
-  // Check existence
-  const exists = yield* cache.has("key")
-
-  // Remove
-  yield* cache.forget("key")
-  yield* cache.flush()                      // clear all
-
-  // Atomic increment/decrement
-  const newCount = yield* cache.increment("counter", 1)
-  yield* cache.decrement("counter", 5)
-
-  // Bulk operations
-  const values = yield* cache.many(["key1", "key2", "key3"])
-  yield* cache.putMany(new Map([["a", 1], ["b", 2]]), minutes(5))
+  // Delete a value
+  yield* cache.forget("user:1")
 })
 ```
 
 ## The Remember Pattern
 
-<Callout type="info">
-The most powerful caching pattern — fetch from cache or compute and store.
-Perfect for expensive operations like database queries or API calls.
-</Callout>
+The most useful caching pattern — get from cache, or compute and store:
 
 ```typescript
-import { Cache } from "@gello/cache"
-import { minutes } from "@gello/time"
-import { Effect } from "effect"
-
-// Cache-aside pattern: get from cache or compute
 const getUser = (id: string) =>
   Effect.gen(function* () {
     const cache = yield* Cache
 
     return yield* cache.remember(
       `user:${id}`,
-      minutes(30),
-      // Only runs if cache miss
+      "30 minutes",
+      // Only runs if not in cache
       Effect.gen(function* () {
         const db = yield* Database
         return yield* db.users.findById(id)
       })
     )
   })
+```
 
-// Remember forever (until manually cleared)
-const getSettings = () =>
-  Effect.gen(function* () {
-    const cache = yield* Cache
-    return yield* cache.rememberForever("app:settings", loadSettings)
-  })
+Now calls to `getUser("123")` will:
+1. Check the cache for `user:123`
+2. If found, return the cached value
+3. If not found, query the database, cache the result, then return it
+
+## Cache Operations
+
+```typescript
+const handler = Effect.gen(function* () {
+  const cache = yield* Cache
+
+  // Store values
+  yield* cache.put("key", value)                    // Forever
+  yield* cache.put("key", value, "1 hour")          // With expiration
+
+  // Get values
+  const result = yield* cache.get("key")            // Option<T>
+
+  // Check if exists
+  const exists = yield* cache.has("key")
+
+  // Get and delete
+  const pulled = yield* cache.pull("key")           // Gets then deletes
+
+  // Delete
+  yield* cache.forget("key")
+  yield* cache.flush()                              // Clear everything
+
+  // Increment/decrement numbers
+  yield* cache.increment("counter")
+  yield* cache.increment("counter", 5)
+  yield* cache.decrement("counter")
+})
 ```
 
 ## Cache Drivers
 
-### Memory Store
+### Memory (Default)
 
-Fast in-process cache with optional LRU eviction. Great for development and single-instance deployments.
-
-```typescript
-import { makeMemoryStore, MemoryStoreLive } from "@gello/cache-drivers"
-
-// Direct creation
-const store = Effect.runSync(makeMemoryStore({
-  maxSize: 1000,         // LRU eviction after 1000 entries
-  prefix: "app:",        // Key prefix
-}))
-
-// Or use the Layer
-const CacheLayer = Layer.provide(CacheLive, MemoryStoreLive)
-```
-
-### File Store
-
-Persist cache to disk. Survives restarts and works well for large cached values.
+Fast in-memory cache. Great for development and single-server deployments:
 
 ```typescript
-import { makeFileStore, FileStoreLive } from "@gello/cache-drivers"
+import { MemoryCache } from "@gello/cache"
 
-// Create file-based store
-const store = yield* makeFileStore({
-  directory: "/tmp/cache",
-  extension: ".cache",    // default
-  prefix: "app:",
-})
-
-// Layer for DI
-const CacheLayer = FileStoreLive({
-  directory: config.cache.file.directory,
+const CacheLive = MemoryCache.layer({
+  maxSize: 1000,  // Evict oldest after 1000 entries
 })
 ```
 
-### Redis Store
+### Redis
 
-Distributed cache for multi-instance deployments. Supports tags for group invalidation.
-
-```typescript
-import { makeRedisStore, RedisStoreLiveScoped } from "@gello/cache-drivers"
-import { createClient } from "redis"
-
-// With existing Redis client
-const redis = createClient({ url: "redis://localhost:6379" })
-await redis.connect()
-
-const store = makeRedisStore(redis, {
-  prefix: "app:",
-  defaultTtl: Duration.hours(1),
-})
-
-// Tagged cache operations
-const taggedStore = store as TaggableStore
-yield* taggedStore.tags(["users", "profile"]).put("user:1", user)
-yield* taggedStore.tags(["users"]).flush() // Invalidate all user caches
-```
-
-### Multi-Level Cache (L1/L2)
-
-Combine fast local cache with persistent distributed cache for optimal performance.
+For multi-server deployments — all servers share the same cache:
 
 ```typescript
-import { makeMultiStore, makeReadThroughStore } from "@gello/cache-drivers"
+import { RedisCache } from "@gello/cache"
 
-// L1: Fast in-memory cache
-const l1 = Effect.runSync(makeMemoryStore({ maxSize: 100 }))
-
-// L2: Persistent Redis cache
-const l2 = makeRedisStore(redisClient, { prefix: "app:" })
-
-// Multi-level store
-const store = makeMultiStore({
-  l1,
-  l2,
-  l1Ttl: Duration.minutes(5),    // L1 TTL
-  populateL1OnHit: true,          // Write to L1 on L2 hit
-  writeToL1: true,                // Write to L1 on put
+const CacheLive = RedisCache.layer({
+  url: process.env.REDIS_URL,
+  prefix: "myapp:",
 })
 ```
 
-### Null Store
+### File
 
-No-op cache for testing or when caching should be disabled.
+Persist cache to disk:
 
 ```typescript
-import { NullStore, NullStoreLive } from "@gello/cache-drivers"
+import { FileCache } from "@gello/cache"
 
-// Useful for testing or disabling cache in dev
-const TestCacheLayer = Layer.provide(CacheLive, NullStoreLive)
+const CacheLive = FileCache.layer({
+  path: "/tmp/cache",
+})
 ```
 
 ## Configuration
 
+Set your cache driver via environment:
+
 ```bash
-# Cache driver: memory | redis | file | database | null | multi
-CACHE_DRIVER=memory
-CACHE_PREFIX=app:
+# .env
+CACHE_DRIVER=redis
+CACHE_PREFIX=myapp:
 CACHE_TTL=3600
 
-# File store
-CACHE_PATH=/tmp/cache
+# Redis
+REDIS_URL=redis://localhost:6379
+```
 
-# Redis (shared with other services)
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=
+## Invalidating Cache
+
+When data changes, invalidate related caches:
+
+```typescript
+const updateUser = (id: string, data: UpdateData) =>
+  Effect.gen(function* () {
+    const cache = yield* Cache
+    const db = yield* Database
+
+    // Update the database
+    const user = yield* db.users.update(id, data)
+
+    // Invalidate the cache
+    yield* cache.forget(`user:${id}`)
+
+    return user
+  })
+```
+
+## Tagged Cache
+
+Group related cache entries for bulk invalidation:
+
+```typescript
+const cache = yield* Cache
+
+// Store with tags
+yield* cache.tags(["users"]).put("user:1", user)
+yield* cache.tags(["users"]).put("user:2", user)
+yield* cache.tags(["users", "admins"]).put("user:3", admin)
+
+// Invalidate all entries with a tag
+yield* cache.tags(["users"]).flush()  // Clears user:1, user:2, user:3
+```
+
+## Common Patterns
+
+### Cache Database Queries
+
+```typescript
+const getPopularPosts = () =>
+  Effect.gen(function* () {
+    const cache = yield* Cache
+
+    return yield* cache.remember("popular-posts", "10 minutes", () =>
+      db.posts.findMany({
+        orderBy: { views: "desc" },
+        take: 10,
+      })
+    )
+  })
+```
+
+### Cache API Responses
+
+```typescript
+const getWeather = (city: string) =>
+  Effect.gen(function* () {
+    const cache = yield* Cache
+
+    return yield* cache.remember(`weather:${city}`, "1 hour", () =>
+      fetch(`https://api.weather.com/current?city=${city}`)
+        .then(r => r.json())
+    )
+  })
+```
+
+### Cache in Route Handlers
+
+```typescript
+const listUsers = Effect.gen(function* () {
+  const cache = yield* Cache
+
+  const users = yield* cache.remember("users:all", "5 minutes", () =>
+    db.users.findMany()
+  )
+
+  return json(users)
+})
 ```
 
 ## Testing
 
-```typescript
-import { NullStoreLive, MemoryStoreLive } from "@gello/cache-drivers"
-import { makeCacheLayer, Cache } from "@gello/cache"
-import { minutes } from "@gello/time"
-import { Effect, Layer } from "effect"
-
-// Use NullStore for tests that don't need caching
-const TestLayer = Layer.provide(CacheLive, NullStoreLive)
-
-// Or use MemoryStore for integration tests
-const IntegrationTestLayer = Layer.provide(
-  CacheLive,
-  MemoryStoreLive
-)
-
-// Test the remember pattern
-const testRemember = Effect.gen(function* () {
-  const cache = yield* Cache
-  let computeCount = 0
-
-  const compute = Effect.sync(() => {
-    computeCount++
-    return { data: "expensive" }
-  })
-
-  // First call computes
-  yield* cache.remember("key", minutes(1), compute)
-  expect(computeCount).toBe(1)
-
-  // Second call uses cache
-  yield* cache.remember("key", minutes(1), compute)
-  expect(computeCount).toBe(1) // Still 1!
-}).pipe(Effect.provide(IntegrationTestLayer))
-```
-
-## Cache in HTTP Routes
+Use in-memory cache for fast tests:
 
 ```typescript
-import { Cache } from "@gello/cache"
-import { minutes } from "@gello/time"
-import { Effect } from "effect"
+import { MemoryCache, NullCache } from "@gello/cache"
 
-HttpRouter.get("/users/:id", Effect.gen(function* () {
-  const { id } = yield* HttpRouter.params
-  const cache = yield* Cache
+// Real caching in tests
+const TestCacheLive = MemoryCache.layer()
 
-  // Cache user lookups for 5 minutes
-  const user = yield* cache.remember(
-    `user:${id}`,
-    minutes(5),
-    Effect.gen(function* () {
-      const db = yield* Database
-      return yield* db.users.findById(id)
-    })
-  )
-
-  return yield* HttpServerResponse.schemaJson(User)(user)
-}))
-
-// Invalidate on mutation
-HttpRouter.patch("/users/:id", Effect.gen(function* () {
-  const { id } = yield* HttpRouter.params
-  const body = yield* HttpServerRequest.schemaBodyJson(UpdateUser)
-  const cache = yield* Cache
-  const db = yield* Database
-
-  const updated = yield* db.users.update(id, body)
-
-  // Invalidate cache
-  yield* cache.forget(`user:${id}`)
-
-  return yield* HttpServerResponse.schemaJson(User)(updated)
-}))
+// Or disable caching entirely
+const NoCacheLive = NullCache.layer()
 ```
+
+<Callout type="info">
+For production, use Redis to share cache across multiple server instances.
+</Callout>

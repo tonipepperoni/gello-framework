@@ -1,0 +1,215 @@
+---
+title: Authorization
+description: Control who can do what in your application
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+Authorization determines what an authenticated user is allowed to do. Gello provides a flexible system for defining and checking permissions.
+
+## Defining Abilities
+
+Define what users can do using `defineAbilitiesFor`:
+
+```typescript
+import { defineAbilitiesFor } from "@gello/auth"
+
+const abilities = defineAbilitiesFor(user, ({ can, cannot }) => {
+  // Everyone can read posts
+  can("read", "Post")
+
+  // Users can update their own posts
+  can("update", "Post", { authorId: user.id })
+
+  // Admins can do everything
+  if (user.role === "admin") {
+    can("manage", "all")
+  }
+
+  // No one can delete published posts
+  cannot("delete", "Post", { published: true })
+})
+```
+
+## Checking Permissions
+
+Once you have abilities defined, check them in your handlers:
+
+```typescript
+const updatePost = Effect.gen(function* () {
+  const user = yield* Auth.user()
+  const post = yield* PostRepo.find(postId)
+
+  const abilities = defineAbilitiesFor(user, ...)
+
+  if (abilities.cannot("update", post)) {
+    return forbidden({ error: "You can't edit this post" })
+  }
+
+  // ... update the post
+})
+```
+
+### Using authorize()
+
+For cleaner code, use `authorize()` which throws automatically:
+
+```typescript
+const updatePost = Effect.gen(function* () {
+  const user = yield* Auth.user()
+  const post = yield* PostRepo.find(postId)
+
+  const abilities = defineAbilitiesFor(user, ...)
+
+  // Throws ForbiddenError if not allowed
+  yield* abilities.authorize("update", post)
+
+  // ... update the post
+})
+```
+
+## Middleware Guards
+
+Protect entire routes with authorization middleware:
+
+```typescript
+import { authorize } from "@gello/auth"
+
+const adminRoutes = Route.group({
+  middleware: [
+    authenticate(),
+    authorize("access", "AdminPanel"),
+  ]
+}, [
+  route.get("/admin/users", listUsers),
+  route.delete("/admin/users/:id", deleteUser),
+])
+```
+
+### Dynamic Authorization
+
+When you need to check against a resource loaded in the handler:
+
+```typescript
+route.delete("/posts/:id",
+  authenticate(),
+  authorize("delete", async (req) => {
+    // Load the resource first
+    return await PostRepo.find(req.params.id)
+  }),
+  deletePost
+)
+```
+
+## Common Patterns
+
+### Own Resources Only
+
+Let users access only their own resources:
+
+```typescript
+defineAbilitiesFor(user, ({ can }) => {
+  can("read", "Post", { authorId: user.id })
+  can("update", "Post", { authorId: user.id })
+  can("delete", "Post", { authorId: user.id })
+})
+```
+
+### Role-Based Access
+
+Different permissions for different roles:
+
+```typescript
+defineAbilitiesFor(user, ({ can }) => {
+  // All users
+  can("read", "Post")
+
+  // Editors
+  if (user.role === "editor") {
+    can("create", "Post")
+    can("update", "Post")
+  }
+
+  // Admins
+  if (user.role === "admin") {
+    can("manage", "all")
+  }
+})
+```
+
+### Team Permissions
+
+Permissions based on team membership:
+
+```typescript
+defineAbilitiesFor(user, ({ can }) => {
+  // Can access projects in their teams
+  for (const team of user.teams) {
+    can("read", "Project", { teamId: team.id })
+
+    if (team.role === "owner") {
+      can("manage", "Project", { teamId: team.id })
+    }
+  }
+})
+```
+
+## Actions
+
+Standard actions you can use:
+
+| Action | Meaning |
+|--------|---------|
+| `create` | Create new resources |
+| `read` | View resources |
+| `update` | Modify resources |
+| `delete` | Remove resources |
+| `manage` | All actions (wildcard) |
+
+You can also define custom actions:
+
+```typescript
+can("publish", "Post")
+can("archive", "Post")
+can("invite", "Team")
+```
+
+## Subjects
+
+Subjects are the things users interact with:
+
+```typescript
+// String subjects
+can("read", "Post")
+can("manage", "User")
+
+// Instance subjects (checked against conditions)
+can("update", post)  // Checks conditions against this specific post
+
+// Wildcard
+can("manage", "all")  // Can do anything to anything
+```
+
+## Error Handling
+
+When authorization fails:
+
+```typescript
+import { ForbiddenError } from "@gello/auth"
+
+const handler = Effect.gen(function* () {
+  yield* abilities.authorize("delete", post)
+}).pipe(
+  Effect.catchTag("ForbiddenError", (error) =>
+    Effect.succeed(forbidden({
+      error: "You don't have permission to do this",
+      action: error.action,
+      subject: error.subject,
+    }))
+  )
+)
+```
+
+<Callout type="info">
+Authorization works with [Authentication](/docs/authentication). Make sure users are authenticated before checking their permissions.
+</Callout>

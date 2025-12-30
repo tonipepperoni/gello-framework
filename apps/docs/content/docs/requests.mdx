@@ -1,0 +1,178 @@
+---
+title: Requests
+description: Accessing request data in your handlers
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+Every route handler has access to the incoming HTTP request. Gello provides helpers to extract data from the URL, headers, query string, and body.
+
+## Route Parameters
+
+When you define a route with dynamic segments like `/users/:id`, you can access those values with `getParam`:
+
+```typescript
+import { getParam } from "@gello/common"
+
+const getUser = Effect.gen(function* () {
+  const id = yield* getParam("id")
+
+  // id is a string, parse it if you need a number
+  const userId = parseInt(id)
+
+  // ...fetch user
+})
+
+// Route definition
+route.get("/users/:id", getUser)
+```
+
+Multiple parameters work the same way:
+
+```typescript
+// Route: /users/:userId/posts/:postId
+const getPost = Effect.gen(function* () {
+  const userId = yield* getParam("userId")
+  const postId = yield* getParam("postId")
+
+  // ...
+})
+```
+
+## Query Parameters
+
+For URLs like `/search?q=hello&page=2`, use the query helpers:
+
+```typescript
+import {
+  getQuery,
+  getQueryAsNumber,
+  getQueryAsBoolean
+} from "@gello/common"
+
+const search = Effect.gen(function* () {
+  // Get as string (returns Option)
+  const q = yield* getQuery("q")
+
+  // Get as number with default
+  const page = yield* getQueryAsNumber("page", 1)
+
+  // Get as boolean
+  const includeArchived = yield* getQueryAsBoolean("archived")
+
+  // ...
+})
+```
+
+## Request Body
+
+### JSON Body
+
+Parse the request body as JSON:
+
+```typescript
+import { getJsonBody } from "@gello/platform-node"
+
+const createUser = Effect.gen(function* () {
+  const body = yield* getJsonBody()
+
+  // body is typed as unknown, validate it
+  const name = body.name as string
+  const email = body.email as string
+
+  // Better: use schema validation
+  // const data = yield* parseBody(CreateUserSchema)
+})
+```
+
+<Callout type="info">
+For type-safe body parsing, see [Validation](/docs/validation) which covers schema-based request validation.
+</Callout>
+
+### Raw Body
+
+For non-JSON bodies (like file uploads), get the raw body:
+
+```typescript
+import { getRawBody } from "@gello/platform-node"
+
+const uploadFile = Effect.gen(function* () {
+  const body = yield* getRawBody()
+  // body is a Uint8Array
+})
+```
+
+## Headers
+
+Access individual headers or all headers:
+
+```typescript
+import { getHeader, getHeaders } from "@gello/platform-node"
+
+const handler = Effect.gen(function* () {
+  // Get a single header
+  const contentType = yield* getHeader("content-type")
+
+  // Get authorization token
+  const auth = yield* getHeader("authorization")
+
+  // Get all headers
+  const headers = yield* getHeaders()
+})
+```
+
+### Bearer Tokens
+
+A convenience helper for extracting bearer tokens:
+
+```typescript
+import { getBearerToken } from "@gello/platform-node"
+
+const protectedRoute = Effect.gen(function* () {
+  const token = yield* getBearerToken()
+  // Returns the token without "Bearer " prefix
+  // Returns Option.none if not present
+})
+```
+
+## Request Object
+
+For full access to the underlying request:
+
+```typescript
+import { getRequest } from "@gello/platform-node"
+
+const handler = Effect.gen(function* () {
+  const request = yield* getRequest()
+
+  // Access method, url, headers, etc.
+  console.log(request.method)
+  console.log(request.url)
+})
+```
+
+## URL Information
+
+Get details about the request URL:
+
+```typescript
+import { getUrl, getPath, getMethod } from "@gello/platform-node"
+
+const handler = Effect.gen(function* () {
+  const url = yield* getUrl()       // Full URL object
+  const path = yield* getPath()     // Just the path, e.g., "/users/123"
+  const method = yield* getMethod() // "GET", "POST", etc.
+})
+```
+
+## Quick Reference
+
+| Helper | Returns | Example |
+|--------|---------|---------|
+| `getParam("id")` | Route parameter | `/users/:id` → `"123"` |
+| `getQuery("q")` | Query string value | `?q=hello` → `Option<"hello">` |
+| `getQueryAsNumber("page", 1)` | Query as number | `?page=2` → `2` |
+| `getJsonBody()` | Parsed JSON body | `{ name: "Alice" }` |
+| `getHeader("x-api-key")` | Header value | `Option<string>` |
+| `getBearerToken()` | Token from Authorization | `Option<string>` |
+| `getRequest()` | Full request object | `HttpServerRequest` |

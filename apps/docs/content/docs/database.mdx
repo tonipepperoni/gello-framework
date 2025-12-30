@@ -1,98 +1,46 @@
 ---
 title: Database
-description: Type-safe database access with Drizzle ORM and Effect's resource management
+description: Connect to databases and run queries
 ---
 
-import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Steps, Step } from 'fumadocs-ui/components/steps';
 
-## Setup
+Gello integrates with [Drizzle ORM](https://orm.drizzle.team/) for type-safe database access.
 
-<Tabs items={['pnpm', 'npm', 'yarn']}>
-  <Tab value="pnpm">
-    ```bash
-    pnpm add drizzle-orm pg
-    pnpm add -D drizzle-kit @types/pg
-    ```
-  </Tab>
-  <Tab value="npm">
-    ```bash
-    npm install drizzle-orm pg
-    npm install -D drizzle-kit @types/pg
-    ```
-  </Tab>
-  <Tab value="yarn">
-    ```bash
-    yarn add drizzle-orm pg
-    yarn add -D drizzle-kit @types/pg
-    ```
-  </Tab>
-</Tabs>
+## Quick Start
 
-## Connection Pool Layer
+<Steps>
+<Step>
+### Install Drizzle
 
-The database pool is a scoped resource — acquired on startup, released on shutdown.
-
-```typescript
-import { Pool } from "pg"
-import { Context, Effect, Layer } from "effect"
-
-class PgPool extends Context.Tag("PgPool")<PgPool, Pool>() {}
-
-const PgPoolLive = Layer.scoped(
-  PgPool,
-  Effect.acquireRelease(
-    Effect.gen(function* () {
-      const cfg = yield* Config
-      const pool = new Pool({ connectionString: cfg.DATABASE_URL })
-
-      // Test connection
-      const client = yield* Effect.tryPromise(() => pool.connect())
-      client.release()
-
-      yield* Effect.log("Database connected")
-      return pool
-    }),
-    (pool) =>
-      Effect.tryPromise(() => pool.end()).pipe(
-        Effect.tap(() => Effect.log("Database disconnected")),
-        Effect.orDie
-      )
-  )
-).pipe(Layer.provide(ConfigLive))
+```bash
+pnpm add drizzle-orm pg
+pnpm add -D drizzle-kit @types/pg
 ```
+</Step>
 
-## Drizzle Layer
+<Step>
+### Configure your connection
 
-```typescript
-import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres"
-import * as schema from "./schema"
-
-class Db extends Context.Tag("Db")<
-  Db,
-  NodePgDatabase<typeof schema>
->() {}
-
-const DbLive = Layer.effect(
-  Db,
-  Effect.gen(function* () {
-    const pool = yield* PgPool
-    return drizzle(pool, { schema })
-  })
-).pipe(Layer.provide(PgPoolLive))
+```bash
+# .env
+DATABASE_URL=postgresql://user:pass@localhost:5432/myapp
 ```
+</Step>
 
-## Schema Definition
+<Step>
+### Define your schema
 
 ```typescript
-// src/lib/db/schema.ts
+// src/db/schema.ts
 import { pgTable, text, timestamp, boolean } from "drizzle-orm/pg-core"
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull()
+  createdAt: timestamp("created_at").defaultNow(),
 })
 
 export const posts = pgTable("posts", {
@@ -101,99 +49,249 @@ export const posts = pgTable("posts", {
   content: text("content"),
   published: boolean("published").default(false),
   authorId: text("author_id").references(() => users.id),
-  createdAt: timestamp("created_at").defaultNow().notNull()
 })
 ```
+</Step>
+</Steps>
 
-## Repository Pattern
+## Setting Up the Database Layer
+
+Create a database service that Gello manages:
 
 ```typescript
-import { eq } from "drizzle-orm"
-import { users } from "../lib/db/schema"
+// src/db/index.ts
+import { drizzle } from "drizzle-orm/node-postgres"
+import { Pool } from "pg"
+import { Effect, Layer, Context } from "effect"
+import * as schema from "./schema"
 
-export const UserRepoLive = Layer.effect(
-  UserRepo,
+class Database extends Context.Tag("Database")<
+  Database,
+  ReturnType<typeof drizzle>
+>() {}
+
+const DatabaseLive = Layer.scoped(
+  Database,
   Effect.gen(function* () {
-    const db = yield* Db
+    const config = yield* Config
+    const url = yield* config.string("DATABASE_URL")
 
-    return {
-      findById: (id) =>
-        Effect.tryPromise(async () => {
-          const [user] = await db.select().from(users).where(eq(users.id, id))
-          return user ?? null
-        }),
+    // Create pool that closes when app shuts down
+    const pool = yield* Effect.acquireRelease(
+      Effect.sync(() => new Pool({ connectionString: url })),
+      (pool) => Effect.promise(() => pool.end())
+    )
 
-      create: (data) =>
-        Effect.tryPromise(async () => {
-          const id = crypto.randomUUID()
-          const [user] = await db.insert(users).values({ id, ...data }).returning()
-          return user
-        }),
-
-      list: ({ page, limit }) =>
-        Effect.tryPromise(() =>
-          db.select().from(users).limit(limit).offset((page - 1) * limit)
-        )
-    }
+    return drizzle(pool, { schema })
   })
 )
 ```
 
-## Transactions
+## Running Queries
+
+### Select
 
 ```typescript
-const transferFunds = (fromId: string, toId: string, amount: number) =>
-  Effect.gen(function* () {
-    const db = yield* Db
+import { eq } from "drizzle-orm"
 
-    return yield* Effect.tryPromise(() =>
-      db.transaction(async (tx) => {
-        await tx.update(accounts)
-          .set({ balance: sql`balance - ${amount}` })
-          .where(eq(accounts.id, fromId))
+const listUsers = Effect.gen(function* () {
+  const db = yield* Database
 
-        await tx.update(accounts)
-          .set({ balance: sql`balance + ${amount}` })
-          .where(eq(accounts.id, toId))
+  const users = yield* Effect.tryPromise(() =>
+    db.select().from(schema.users)
+  )
 
-        return { success: true }
-      })
-    )
-  })
-```
-
-## Queries with Joins
-
-```typescript
-const getPostWithAuthor = (postId: string) =>
-  Effect.gen(function* () {
-    const db = yield* Db
-
-    const result = yield* Effect.tryPromise(() =>
-      db.query.posts.findFirst({
-        where: eq(posts.id, postId),
-        with: {
-          author: true
-        }
-      })
-    )
-
-    return result
-  })
-```
-
-## Testing with Test Database
-
-```typescript
-// Use a test database
-const ConfigTest = Layer.succeed(Config, {
-  DATABASE_URL: "postgres://localhost/myapp_test",
-  // ...
+  return json(users)
 })
 
-// Or use an in-memory mock
-const DbTest = Layer.succeed(Db, {
-  select: () => ({ from: () => ({ where: () => Promise.resolve([]) }) }),
-  insert: () => ({ values: () => ({ returning: () => Promise.resolve([]) }) })
-} as unknown as NodePgDatabase)
+const getUser = Effect.gen(function* () {
+  const db = yield* Database
+  const id = yield* getParam("id")
+
+  const [user] = yield* Effect.tryPromise(() =>
+    db.select()
+      .from(schema.users)
+      .where(eq(schema.users.id, id))
+  )
+
+  if (!user) {
+    return notFound({ error: "User not found" })
+  }
+
+  return json(user)
+})
 ```
+
+### Insert
+
+```typescript
+const createUser = Effect.gen(function* () {
+  const db = yield* Database
+  const body = yield* getJsonBody()
+
+  const [user] = yield* Effect.tryPromise(() =>
+    db.insert(schema.users)
+      .values({
+        id: crypto.randomUUID(),
+        name: body.name,
+        email: body.email,
+      })
+      .returning()
+  )
+
+  return created(user)
+})
+```
+
+### Update
+
+```typescript
+const updateUser = Effect.gen(function* () {
+  const db = yield* Database
+  const id = yield* getParam("id")
+  const body = yield* getJsonBody()
+
+  const [user] = yield* Effect.tryPromise(() =>
+    db.update(schema.users)
+      .set({ name: body.name })
+      .where(eq(schema.users.id, id))
+      .returning()
+  )
+
+  return json(user)
+})
+```
+
+### Delete
+
+```typescript
+const deleteUser = Effect.gen(function* () {
+  const db = yield* Database
+  const id = yield* getParam("id")
+
+  yield* Effect.tryPromise(() =>
+    db.delete(schema.users)
+      .where(eq(schema.users.id, id))
+  )
+
+  return noContent()
+})
+```
+
+## Transactions
+
+Wrap multiple operations in a transaction:
+
+```typescript
+const transferMoney = Effect.gen(function* () {
+  const db = yield* Database
+  const { fromId, toId, amount } = yield* getJsonBody()
+
+  yield* Effect.tryPromise(() =>
+    db.transaction(async (tx) => {
+      // Deduct from sender
+      await tx.update(accounts)
+        .set({ balance: sql`balance - ${amount}` })
+        .where(eq(accounts.id, fromId))
+
+      // Add to receiver
+      await tx.update(accounts)
+        .set({ balance: sql`balance + ${amount}` })
+        .where(eq(accounts.id, toId))
+    })
+  )
+
+  return json({ success: true })
+})
+```
+
+## Relationships
+
+Query related data with joins:
+
+```typescript
+const getPostWithAuthor = Effect.gen(function* () {
+  const db = yield* Database
+  const id = yield* getParam("id")
+
+  const post = yield* Effect.tryPromise(() =>
+    db.query.posts.findFirst({
+      where: eq(posts.id, id),
+      with: {
+        author: true  // Include the author
+      }
+    })
+  )
+
+  return json(post)
+})
+```
+
+## Pagination
+
+```typescript
+const listUsers = Effect.gen(function* () {
+  const db = yield* Database
+  const page = yield* getQueryAsNumber("page", 1)
+  const limit = yield* getQueryAsNumber("limit", 20)
+
+  const users = yield* Effect.tryPromise(() =>
+    db.select()
+      .from(schema.users)
+      .limit(limit)
+      .offset((page - 1) * limit)
+  )
+
+  return json(users)
+})
+```
+
+## Migrations
+
+Generate and run migrations:
+
+```bash
+# Generate migration from schema changes
+npx drizzle-kit generate:pg
+
+# Apply migrations to database
+npx drizzle-kit push:pg
+```
+
+Configure in `drizzle.config.ts`:
+
+```typescript
+import type { Config } from "drizzle-kit"
+
+export default {
+  schema: "./src/db/schema.ts",
+  out: "./drizzle",
+  driver: "pg",
+  dbCredentials: {
+    connectionString: process.env.DATABASE_URL!,
+  },
+} satisfies Config
+```
+
+## Testing
+
+Use a test database:
+
+```typescript
+const TestDatabaseLive = Layer.scoped(
+  Database,
+  Effect.gen(function* () {
+    const pool = new Pool({
+      connectionString: "postgres://localhost/myapp_test"
+    })
+    return drizzle(pool, { schema })
+  })
+)
+
+// Run tests with test database
+await runEffect(handler, TestDatabaseLive)
+```
+
+<Callout type="info">
+For more on Drizzle ORM, see the [official documentation](https://orm.drizzle.team/docs/overview).
+</Callout>

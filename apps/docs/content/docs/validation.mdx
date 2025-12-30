@@ -1,12 +1,13 @@
 ---
 title: Validation
-description: Type-safe validation with @effect/schema — validate once, trust everywhere
+description: Validate request data with type-safe schemas
 ---
 
-## Schema Definitions
+import { Callout } from 'fumadocs-ui/components/callout';
 
-Define schemas that serve as both runtime validators and TypeScript types.
-No duplicate type definitions needed.
+Gello uses `@effect/schema` for validation. Define a schema once and get both runtime validation and TypeScript types.
+
+## Basic Usage
 
 ```typescript
 import * as S from "@effect/schema/Schema"
@@ -15,50 +16,43 @@ import * as S from "@effect/schema/Schema"
 const CreateUser = S.Struct({
   name: S.String.pipe(S.minLength(2), S.maxLength(100)),
   email: S.String.pipe(S.pattern(/@/)),
-  age: S.optional(S.Number.pipe(S.int(), S.positive()))
+  age: S.optional(S.Number.pipe(S.int(), S.positive())),
 })
 
-// Infer the type
+// TypeScript type is inferred automatically
 type CreateUser = S.Schema.Type<typeof CreateUser>
 // { name: string; email: string; age?: number }
 ```
 
-## Request Body Validation
+## Validating Request Body
 
 ```typescript
-import * as HttpServerRequest from "@effect/platform/HttpServerRequest"
+const createUser = Effect.gen(function* () {
+  // Validates and parses the JSON body
+  const body = yield* parseBody(CreateUser)
 
-HttpRouter.post("/users", Effect.gen(function* () {
-  // Validates and decodes — fails with ParseError on bad input
-  const body = yield* HttpServerRequest.schemaBodyJson(CreateUser)
+  // body is fully typed — TypeScript knows it matches CreateUser
+  const user = yield* UserRepo.create(body)
 
-  // body is fully typed as CreateUser
-  const repo = yield* UserRepo
-  const user = yield* repo.create(body)
-
-  return HttpServerResponse.json(user, { status: 201 })
-}))
+  return created(user)
+})
 ```
+
+If validation fails, Gello returns a 400 response with error details.
 
 ## Path Parameters
 
 ```typescript
 const UserIdParam = S.Struct({
-  id: S.String.pipe(S.pattern(/^[a-f0-9-]{36}$/)) // UUID format
+  id: S.String.pipe(S.pattern(/^[a-f0-9-]{36}$/)),  // UUID format
 })
 
-HttpRouter.get("/users/:id", Effect.gen(function* () {
-  const { id } = yield* HttpRouter.schemaPathParams(UserIdParam)
+const getUser = Effect.gen(function* () {
+  const { id } = yield* parseParams(UserIdParam)
 
-  const repo = yield* UserRepo
-  const user = yield* repo.findById(id)
-
-  if (!user) {
-    return HttpServerResponse.empty({ status: 404 })
-  }
-
-  return HttpServerResponse.json(user)
-}))
+  const user = yield* UserRepo.findById(id)
+  return json(user)
+})
 ```
 
 ## Query Parameters
@@ -67,67 +61,65 @@ HttpRouter.get("/users/:id", Effect.gen(function* () {
 const PaginationQuery = S.Struct({
   page: S.optional(S.NumberFromString).pipe(S.withDefault(() => 1)),
   limit: S.optional(S.NumberFromString).pipe(S.withDefault(() => 20)),
-  sort: S.optional(S.Literal("asc", "desc")).pipe(S.withDefault(() => "desc" as const))
+  sort: S.optional(S.Literal("asc", "desc")).pipe(S.withDefault(() => "desc" as const)),
 })
 
-HttpRouter.get("/users", Effect.gen(function* () {
-  const query = yield* HttpRouter.schemaSearchParams(PaginationQuery)
+const listUsers = Effect.gen(function* () {
+  const query = yield* parseQuery(PaginationQuery)
   // query: { page: number; limit: number; sort: "asc" | "desc" }
 
-  const repo = yield* UserRepo
-  const users = yield* repo.list(query)
-
-  return HttpServerResponse.json(users)
-}))
+  const users = yield* UserRepo.list(query)
+  return json(users)
+})
 ```
 
-## Response Validation
+## Common Validators
 
 ```typescript
-const UserResponse = S.Struct({
-  id: S.String,
-  name: S.String,
-  email: S.String,
-  createdAt: S.Date
-})
+// String constraints
+S.String.pipe(S.minLength(2))
+S.String.pipe(S.maxLength(100))
+S.String.pipe(S.pattern(/^[a-z]+$/))
+S.String.pipe(S.nonEmpty())
 
-HttpRouter.get("/users/:id", Effect.gen(function* () {
-  const { id } = yield* HttpRouter.schemaPathParams(S.Struct({ id: S.String }))
+// Number constraints
+S.Number.pipe(S.positive())
+S.Number.pipe(S.int())
+S.Number.pipe(S.between(1, 100))
 
-  const repo = yield* UserRepo
-  const user = yield* repo.findById(id)
+// Enums
+S.Literal("pending", "approved", "rejected")
 
-  if (!user) {
-    return HttpServerResponse.empty({ status: 404 })
-  }
+// Optional with defaults
+S.optional(S.String).pipe(S.withDefault(() => "default"))
 
-  // Type-checked: response must match UserResponse schema
-  return yield* HttpServerResponse.schemaJson(UserResponse)(user)
-}))
+// Arrays
+S.Array(S.String)
+S.Array(S.String).pipe(S.minItems(1))
 ```
 
 ## Custom Validators
 
 ```typescript
-// Email with custom validation
+// Email validation
 const Email = S.String.pipe(
   S.filter((s) => s.includes("@") && s.includes("."), {
-    message: () => "Invalid email format"
+    message: () => "Invalid email format",
   })
 )
 
-// Password with strength requirements
+// Password with requirements
 const Password = S.String.pipe(
   S.minLength(8),
   S.filter((s) => /[A-Z]/.test(s), {
-    message: () => "Must contain uppercase letter"
+    message: () => "Must contain an uppercase letter",
   }),
   S.filter((s) => /[0-9]/.test(s), {
-    message: () => "Must contain number"
+    message: () => "Must contain a number",
   })
 )
 
-// Slug format
+// URL slug
 const Slug = S.String.pipe(
   S.pattern(/^[a-z0-9-]+$/),
   S.minLength(3),
@@ -137,58 +129,40 @@ const Slug = S.String.pipe(
 
 ## Transformations
 
+Transform data during validation:
+
 ```typescript
-// Transform on decode
+// Trim whitespace
 const TrimmedString = S.String.pipe(
   S.transform(S.String, {
     decode: (s) => s.trim(),
-    encode: (s) => s
+    encode: (s) => s,
   })
 )
 
-// Date from ISO string
+// Parse date from string
 const DateFromString = S.String.pipe(
   S.transform(S.Date, {
     decode: (s) => new Date(s),
-    encode: (d) => d.toISOString()
+    encode: (d) => d.toISOString(),
   })
 )
-
-// Or use built-in
-import { S.DateFromString } from "@effect/schema/Schema"
-```
-
-## Error Handling
-
-```typescript
-HttpRouter.post("/users", Effect.gen(function* () {
-  const body = yield* HttpServerRequest.schemaBodyJson(CreateUser)
-  // ...
-}).pipe(
-  Effect.catchTag("ParseError", (e) =>
-    HttpServerResponse.json(
-      {
-        error: "Validation failed",
-        details: ArrayFormatter.formatErrorSync(e)
-      },
-      { status: 400 }
-    )
-  )
-))
 ```
 
 ## Reusable Schemas
+
+Create a schema library for your app:
 
 ```typescript
 // schemas/user.ts
 export const UserBase = S.Struct({
   name: S.String.pipe(S.minLength(2)),
-  email: Email
+  email: Email,
 })
 
 export const CreateUser = UserBase.pipe(
   S.extend(S.Struct({
-    password: Password
+    password: Password,
   }))
 )
 
@@ -198,7 +172,24 @@ export const User = UserBase.pipe(
   S.extend(S.Struct({
     id: S.String,
     createdAt: S.Date,
-    updatedAt: S.Date
   }))
 )
 ```
+
+## Error Messages
+
+Validation errors include helpful details:
+
+```json
+{
+  "error": "Validation failed",
+  "issues": [
+    { "path": "name", "message": "Expected string with at least 2 characters" },
+    { "path": "email", "message": "Invalid email format" }
+  ]
+}
+```
+
+<Callout type="info">
+Schemas validate on the way in (decoding) and can also validate on the way out (encoding). Use `schemaJson` for response validation.
+</Callout>

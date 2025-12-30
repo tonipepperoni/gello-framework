@@ -1,0 +1,179 @@
+---
+title: Your First App
+description: Build a simple API in 10 minutes
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+
+Let's build a simple todo API to see how Gello works. By the end, you'll have an API that can create, list, and complete todos.
+
+## Create the Project
+
+<Steps>
+<Step>
+### Generate a new project
+
+```bash
+npx gello new todo-api
+cd todo-api
+pnpm install
+```
+</Step>
+<Step>
+### Start the dev server
+
+```bash
+pnpm dev
+```
+
+You should see:
+```
+🚀 todo-api starting...
+   Listening on http://0.0.0.0:3000
+```
+</Step>
+</Steps>
+
+## Define Your Routes
+
+Open `src/index.ts` and replace its contents:
+
+```typescript
+import { createApp, route, json, created, noContent } from "@gello/platform-node"
+import { Effect } from "effect"
+
+// In-memory storage (we'll use a real database later)
+let todos: Array<{ id: number; title: string; completed: boolean }> = []
+let nextId = 1
+
+// List all todos
+const listTodos = Effect.gen(function* () {
+  return json(todos)
+})
+
+// Create a new todo
+const createTodo = Effect.gen(function* () {
+  const body = yield* getJsonBody()
+
+  const todo = {
+    id: nextId++,
+    title: body.title,
+    completed: false,
+  }
+  todos.push(todo)
+
+  return created(todo)
+})
+
+// Mark a todo as completed
+const completeTodo = Effect.gen(function* () {
+  const id = yield* getParam("id")
+
+  const todo = todos.find(t => t.id === parseInt(id))
+  if (!todo) {
+    return notFound({ error: "Todo not found" })
+  }
+
+  todo.completed = true
+  return json(todo)
+})
+
+// Delete a todo
+const deleteTodo = Effect.gen(function* () {
+  const id = yield* getParam("id")
+
+  todos = todos.filter(t => t.id !== parseInt(id))
+  return noContent()
+})
+
+// Create the app with routes
+const app = createApp({ port: 3000 })
+  .routes([
+    route.get("/todos", listTodos),
+    route.post("/todos", createTodo),
+    route.patch("/todos/:id/complete", completeTodo),
+    route.delete("/todos/:id", deleteTodo),
+  ])
+
+app.run()
+```
+
+## Test Your API
+
+With the server running, open another terminal:
+
+```bash
+# Create a todo
+curl -X POST http://localhost:3000/todos \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Learn Gello"}'
+
+# List todos
+curl http://localhost:3000/todos
+
+# Complete a todo
+curl -X PATCH http://localhost:3000/todos/1/complete
+
+# Delete a todo
+curl -X DELETE http://localhost:3000/todos/1
+```
+
+## What Just Happened?
+
+Let's break down the key parts:
+
+### Routes
+
+```typescript
+route.get("/todos", listTodos)
+route.post("/todos", createTodo)
+route.patch("/todos/:id/complete", completeTodo)
+```
+
+Routes map HTTP methods and paths to handler functions. The `:id` syntax creates a dynamic parameter you can access in your handler.
+
+### Handlers
+
+```typescript
+const listTodos = Effect.gen(function* () {
+  return json(todos)
+})
+```
+
+Handlers are functions that return an Effect. The `Effect.gen` function lets you write async code that looks synchronous using `yield*`.
+
+### Getting Request Data
+
+```typescript
+const id = yield* getParam("id")      // From URL: /todos/:id
+const body = yield* getJsonBody()      // From request body
+```
+
+Gello provides helpers to access request data. They're all type-safe and handle errors automatically.
+
+### Responses
+
+```typescript
+return json(todos)           // 200 OK with JSON
+return created(todo)         // 201 Created with JSON
+return noContent()           // 204 No Content
+return notFound({ error })   // 404 Not Found with JSON
+```
+
+Response helpers make it easy to return properly formatted HTTP responses.
+
+## Next Steps
+
+Your todo API works, but it's missing a few things:
+
+- **Validation** — Make sure the title isn't empty
+- **A real database** — Store todos persistently
+- **Error handling** — Return proper error messages
+- **Authentication** — Protect your endpoints
+
+Continue to [Configuration](/docs/configuration) to learn how to set up your app for different environments, or jump to [Routing](/docs/routing) for more on defining endpoints.
+
+<Callout type="info">
+The full code for this tutorial is available in the `examples/todo-api` directory of the Gello repository.
+</Callout>

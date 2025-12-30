@@ -1,163 +1,233 @@
 ---
 title: Middleware
-description: Composable request/response transformations using Effect
+description: Process requests before and after your handlers
 ---
 
-## The Pattern
+import { Callout } from 'fumadocs-ui/components/callout';
 
-Middleware in Gello are functions that wrap handlers, transforming requests or responses.
-They compose naturally using `pipe` and can access/provide context.
+Middleware lets you run code before and after route handlers. Use it for authentication, logging, CORS, and more.
+
+## Using Middleware
+
+Add middleware to your app:
 
 ```typescript
-import * as HttpMiddleware from "@effect/platform/HttpMiddleware"
+import { cors, logging, errorHandler } from "@gello/common"
 
-// Built-in logging middleware
-const withLogging = HttpMiddleware.logger
-
-// Apply to your app
-const HttpApp = pipe(
-  HttpRouter.toHttpApp(AppRouter),
-  withLogging
-)
+const app = createApp({ port: 3000 })
+  .use(logging())       // Log all requests
+  .use(cors())          // Add CORS headers
+  .use(errorHandler())  // Convert errors to responses
+  .routes([...])
 ```
 
-## Custom Middleware
+## Built-in Middleware
+
+### Logging
+
+Logs incoming requests and their responses:
 
 ```typescript
-const withTiming = HttpMiddleware.make((app) =>
-  Effect.gen(function* () {
-    const start = Date.now()
-    const response = yield* app
-    const duration = Date.now() - start
+import { logging } from "@gello/common"
 
-    return response.pipe(
-      HttpServerResponse.setHeader("X-Response-Time", `${duration}ms`)
-    )
-  })
-)
+app.use(logging())
+
+// Output:
+// [INFO] GET /api/users 200 45ms
+// [INFO] POST /api/posts 201 120ms
 ```
 
-## Authentication Middleware
+### CORS
+
+Add Cross-Origin Resource Sharing headers:
 
 ```typescript
-class CurrentUser extends Context.Tag("CurrentUser")<
-  CurrentUser,
-  { id: string; email: string; role: string }
->() {}
+import { cors } from "@gello/common"
 
-const withAuth = HttpMiddleware.make((app) =>
-  Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest
-    const auth = request.headers["authorization"]
+// Allow all origins
+app.use(cors())
 
-    if (!auth?.startsWith("Bearer ")) {
-      return HttpServerResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      )
-    }
-
-    const token = auth.slice(7)
-    const user = yield* verifyToken(token)
-
-    // Provide user to downstream handlers
-    return yield* app.pipe(Effect.provideService(CurrentUser, user))
-  })
-)
+// Specific origins
+app.use(cors({
+  origins: ["https://myapp.com", "https://admin.myapp.com"],
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  headers: ["Content-Type", "Authorization"],
+}))
 ```
 
-## CORS Middleware
+### Timing
+
+Add response time headers:
 
 ```typescript
-const cors = (options: { origins: string | string[] }) =>
-  HttpMiddleware.make((app) =>
+import { timing } from "@gello/common"
+
+app.use(timing())
+
+// Adds X-Response-Time header to all responses
+```
+
+### Error Handler
+
+Convert errors to HTTP responses:
+
+```typescript
+import { errorHandler } from "@gello/common"
+
+app.use(errorHandler())
+```
+
+## Route Group Middleware
+
+Apply middleware to specific route groups:
+
+```typescript
+import { authenticate } from "@gello/auth"
+
+// Public routes — no middleware
+const publicRoutes = [
+  route.get("/health", healthCheck),
+  route.post("/login", login),
+]
+
+// Protected routes — require authentication
+const protectedRoutes = Route.group({
+  prefix: "/api",
+  middleware: [authenticate()],
+}, [
+  route.get("/me", getCurrentUser),
+  route.get("/settings", getSettings),
+])
+
+// Admin routes — require auth + admin role
+const adminRoutes = Route.group({
+  prefix: "/admin",
+  middleware: [authenticate(), requireAdmin()],
+}, [
+  route.get("/users", listAllUsers),
+  route.delete("/users/:id", deleteUser),
+])
+```
+
+## Writing Custom Middleware
+
+A middleware is a function that wraps a handler:
+
+```typescript
+import { Effect } from "effect"
+import type { Middleware } from "@gello/common"
+
+const myMiddleware: Middleware = {
+  name: "myMiddleware",
+  apply: (handler) =>
     Effect.gen(function* () {
-      const request = yield* HttpServerRequest.HttpServerRequest
-      const origin = request.headers["origin"]
+      // Before the handler
+      console.log("Request started")
 
-      const response = yield* app
+      // Run the handler
+      const response = yield* handler
 
-      const allowedOrigins = Array.isArray(options.origins)
-        ? options.origins
-        : [options.origins]
-
-      if (origin && (allowedOrigins.includes("*") || allowedOrigins.includes(origin))) {
-        return response.pipe(
-          HttpServerResponse.setHeader("Access-Control-Allow-Origin", origin),
-          HttpServerResponse.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE"),
-          HttpServerResponse.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization")
-        )
-      }
+      // After the handler
+      console.log("Request completed")
 
       return response
-    })
-  )
+    }),
+}
+
+app.use(myMiddleware)
 ```
 
-## Rate Limiting
+### Add Headers
 
 ```typescript
-const withRateLimit = (limit: number, window: Duration.Duration) =>
-  HttpMiddleware.make((app) =>
+const addHeaders: Middleware = {
+  name: "addHeaders",
+  apply: (handler) =>
     Effect.gen(function* () {
-      const request = yield* HttpServerRequest.HttpServerRequest
-      const redis = yield* Redis
-      const ip = request.headers["x-forwarded-for"] ?? "unknown"
-      const key = `ratelimit:${ip}`
+      const response = yield* handler
+      return response.pipe(
+        HttpServerResponse.setHeader("X-Powered-By", "Gello"),
+        HttpServerResponse.setHeader("X-Request-Id", crypto.randomUUID()),
+      )
+    }),
+}
+```
 
-      const count = yield* Effect.tryPromise(() => redis.incr(key))
+### Authentication
+
+```typescript
+const requireAuth: Middleware = {
+  name: "requireAuth",
+  apply: (handler) =>
+    Effect.gen(function* () {
+      const token = yield* getBearerToken()
+
+      if (!token) {
+        return unauthorized({ error: "Missing token" })
+      }
+
+      const user = yield* verifyToken(token)
+
+      // Make user available to the handler
+      return yield* handler.pipe(
+        Effect.provideService(CurrentUser, user)
+      )
+    }),
+}
+```
+
+### Rate Limiting
+
+```typescript
+const rateLimit = (maxRequests: number, window: string): Middleware => ({
+  name: "rateLimit",
+  apply: (handler) =>
+    Effect.gen(function* () {
+      const ip = yield* getClientIp()
+      const cache = yield* Cache
+
+      const key = `ratelimit:${ip}`
+      const count = yield* cache.increment(key)
 
       if (count === 1) {
-        yield* Effect.tryPromise(() =>
-          redis.expire(key, Duration.toSeconds(window))
-        )
+        yield* cache.expire(key, window)
       }
 
-      if (count > limit) {
-        return HttpServerResponse.json(
-          { error: "Too many requests" },
-          { status: 429 }
-        )
+      if (count > maxRequests) {
+        return json({ error: "Too many requests" }, { status: 429 })
       }
 
-      return yield* app
-    })
-  )
+      return yield* handler
+    }),
+})
+
+app.use(rateLimit(100, "1 minute"))
 ```
 
-## Composing Middleware
+## Middleware Order
+
+Middleware runs in the order it's added:
 
 ```typescript
-// Middleware compose left-to-right
-const HttpApp = pipe(
-  HttpRouter.toHttpApp(AppRouter),
-  withLogging,        // 1. Log request
-  withTiming,         // 2. Track duration
-  cors({ origins: "*" }), // 3. Add CORS headers
-  withRateLimit(100, Duration.minutes(1)) // 4. Rate limit
-)
+app
+  .use(logging())      // 1. Log the request
+  .use(cors())         // 2. Add CORS headers
+  .use(rateLimit())    // 3. Check rate limit
+  .use(authenticate()) // 4. Authenticate user
+  .use(errorHandler()) // 5. Handle errors
 ```
 
-## Route-Specific Middleware
+For route groups, global middleware runs first, then group middleware:
 
 ```typescript
-// Apply middleware to specific routes
-const PublicRouter = pipe(
-  HttpRouter.empty,
-  HttpRouter.get("/health", healthCheck),
-  HttpRouter.get("/docs", getDocs)
-)
+// Order: logging → cors → authenticate → handler
+app.use(logging()).use(cors())
 
-const ProtectedRouter = pipe(
-  HttpRouter.empty,
-  HttpRouter.get("/me", getProfile),
-  HttpRouter.patch("/settings", updateSettings)
-).pipe(withAuth)
-
-// Merge routers
-const AppRouter = pipe(
-  HttpRouter.empty,
-  HttpRouter.mount("/api", PublicRouter),
-  HttpRouter.mount("/api", ProtectedRouter)
-)
+Route.group({
+  middleware: [authenticate()],
+}, [...])
 ```
+
+<Callout type="info">
+Put the error handler last so it can catch errors from all other middleware.
+</Callout>

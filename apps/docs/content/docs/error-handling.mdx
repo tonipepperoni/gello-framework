@@ -1,21 +1,59 @@
 ---
 title: Error Handling
-description: Typed errors with Effect — catch at boundaries, never lose context
+description: Handle errors gracefully and return proper HTTP responses
 ---
 
-## Tagged Errors
+import { Callout } from 'fumadocs-ui/components/callout';
 
-Define domain errors as tagged classes. The type system tracks which errors
-can occur and ensures they're handled.
+Gello uses typed errors so you always know what can go wrong. Errors are converted to HTTP responses automatically or can be handled explicitly.
+
+## Throwing Errors
+
+Return an error from your handler:
 
 ```typescript
-import { Data } from "effect"
+import { Data, Effect } from "effect"
 
+// Define an error type
 class NotFoundError extends Data.TaggedError("NotFoundError")<{
   resource: string
   id: string
 }> {}
 
+const getUser = Effect.gen(function* () {
+  const id = yield* getParam("id")
+  const user = yield* UserRepo.findById(id)
+
+  if (!user) {
+    return yield* new NotFoundError({ resource: "User", id })
+  }
+
+  return json(user)
+})
+```
+
+## Catching Errors
+
+Handle specific errors and return appropriate responses:
+
+```typescript
+const handler = Effect.gen(function* () {
+  const user = yield* getUser(id)
+  return json(user)
+}).pipe(
+  Effect.catchTag("NotFoundError", (error) =>
+    Effect.succeed(notFound({
+      error: `${error.resource} not found`,
+    }))
+  )
+)
+```
+
+## Common Error Types
+
+Define errors for your application:
+
+```typescript
 class ValidationError extends Data.TaggedError("ValidationError")<{
   field: string
   message: string
@@ -24,174 +62,145 @@ class ValidationError extends Data.TaggedError("ValidationError")<{
 class UnauthorizedError extends Data.TaggedError("UnauthorizedError")<{
   reason: string
 }> {}
+
+class ForbiddenError extends Data.TaggedError("ForbiddenError")<{
+  action: string
+}> {}
 ```
 
-## Throwing Errors
+## Handling Multiple Errors
 
 ```typescript
-const getUser = (id: string) =>
-  Effect.gen(function* () {
-    const repo = yield* UserRepo
-    const user = yield* repo.findById(id)
-
-    if (!user) {
-      return yield* new NotFoundError({ resource: "User", id })
-    }
-
-    return user
-  })
-
-// Type: Effect<User, NotFoundError, UserRepo>
-```
-
-## Catching by Tag
-
-```typescript
-HttpRouter.get("/users/:id", Effect.gen(function* () {
-  const { id } = yield* HttpRouter.schemaPathParams(S.Struct({ id: S.String }))
-  const user = yield* getUser(id)
-  return HttpServerResponse.json(user)
+const handler = Effect.gen(function* () {
+  // ... your code
 }).pipe(
-  Effect.catchTag("NotFoundError", (e) =>
-    HttpServerResponse.json(
-      { error: `${e.resource} with id ${e.id} not found` },
-      { status: 404 }
-    )
-  )
-))
-```
+  Effect.catchTags({
+    NotFoundError: (e) =>
+      Effect.succeed(notFound({ error: `${e.resource} not found` })),
 
-## Catching Multiple Errors
+    ValidationError: (e) =>
+      Effect.succeed(badRequest({ error: e.message, field: e.field })),
 
-```typescript
-import { Match } from "effect"
-
-type AppError = NotFoundError | ValidationError | UnauthorizedError
-
-const handleError = (error: AppError) =>
-  Match.value(error).pipe(
-    Match.tag("NotFoundError", (e) =>
-      HttpServerResponse.json(
-        { error: `${e.resource} not found` },
-        { status: 404 }
-      )
-    ),
-    Match.tag("ValidationError", (e) =>
-      HttpServerResponse.json(
-        { error: e.message, field: e.field },
-        { status: 400 }
-      )
-    ),
-    Match.tag("UnauthorizedError", (e) =>
-      HttpServerResponse.json(
-        { error: e.reason },
-        { status: 401 }
-      )
-    ),
-    Match.exhaustive
-  )
-
-// Apply to handler
-handler.pipe(Effect.catchAll(handleError))
+    UnauthorizedError: (e) =>
+      Effect.succeed(unauthorized({ error: e.reason })),
+  })
+)
 ```
 
 ## Global Error Handler
 
+Create a middleware that handles all errors:
+
 ```typescript
-const withErrorHandler = <R>(
-  handler: Effect.Effect<HttpServerResponse.HttpServerResponse, AppError, R>
+const handleErrors = <R>(
+  handler: Effect.Effect<HttpServerResponse, AppError, R>
 ) =>
-  pipe(
-    handler,
-    Effect.catchAll(handleError),
-    Effect.catchAllDefect((defect) => {
-      // Log unexpected errors
-      console.error("Unexpected error:", defect)
-      return HttpServerResponse.json(
-        { error: "Internal server error" },
-        { status: 500 }
-      )
+  handler.pipe(
+    // Handle known errors
+    Effect.catchTags({
+      NotFoundError: (e) =>
+        Effect.succeed(notFound({ error: `${e.resource} not found` })),
+      ValidationError: (e) =>
+        Effect.succeed(badRequest({ error: e.message })),
+      UnauthorizedError: () =>
+        Effect.succeed(unauthorized({ error: "Please log in" })),
+    }),
+
+    // Handle unexpected errors
+    Effect.catchAllDefect((error) => {
+      console.error("Unexpected error:", error)
+      return Effect.succeed(internalError({ error: "Something went wrong" }))
     })
   )
 
-// Wrap all route handlers
-export const routes = [
-  route.get("/users/:id", withErrorHandler(getUser)),
-  route.post("/users", withErrorHandler(createUser)),
-] as const
+// Apply to routes
+const routes = [
+  route.get("/users/:id", handleErrors(getUser)),
+  route.post("/users", handleErrors(createUser)),
+]
 ```
 
-## Error Context
+## Validation Errors
+
+Schema validation errors are handled specially:
 
 ```typescript
-// Add context to errors
-const getUserWithContext = (id: string) =>
-  getUser(id).pipe(
-    Effect.mapError((e) =>
-      e._tag === "NotFoundError"
-        ? new NotFoundError({ ...e, resource: "User" })
-        : e
-    ),
-    Effect.withSpan("getUser", { attributes: { userId: id } })
-  )
-```
-
-## Retry on Failure
-
-```typescript
-import { Schedule } from "effect"
-
-const fetchWithRetry = Effect.gen(function* () {
-  const response = yield* Effect.tryPromise({
-    try: () => fetch("https://api.example.com/data"),
-    catch: () => new NetworkError({ url: "..." })
-  })
-  return yield* Effect.tryPromise(() => response.json())
-}).pipe(
-  Effect.retry(
-    Schedule.exponential("100 millis").pipe(
-      Schedule.compose(Schedule.recurs(3))
-    )
-  ),
-  Effect.catchTag("NetworkError", () =>
-    Effect.succeed({ fallback: true })
-  )
-)
-```
-
-## Effect.catchIf
-
-```typescript
-// Catch errors conditionally
-handler.pipe(
-  Effect.catchIf(
-    (e): e is NotFoundError => e._tag === "NotFoundError" && e.resource === "User",
-    () => HttpServerResponse.json({ error: "User not found" }, { status: 404 })
-  )
-)
-```
-
-## Parse Errors
-
-```typescript
-import { ArrayFormatter } from "@effect/schema"
-
-HttpRouter.post("/users", Effect.gen(function* () {
-  const body = yield* HttpServerRequest.schemaBodyJson(CreateUser)
+const createUser = Effect.gen(function* () {
+  const body = yield* parseBody(CreateUser)
   // ...
 }).pipe(
-  Effect.catchTag("ParseError", (e) => {
-    const issues = ArrayFormatter.formatErrorSync(e)
-    return HttpServerResponse.json(
-      {
-        error: "Validation failed",
-        issues: issues.map(i => ({
-          path: i.path.join("."),
-          message: i.message
-        }))
-      },
-      { status: 400 }
-    )
+  Effect.catchTag("ParseError", (error) => {
+    const issues = formatValidationErrors(error)
+    return Effect.succeed(badRequest({
+      error: "Validation failed",
+      issues,
+    }))
   })
-))
+)
 ```
+
+## Using the Error Handler Middleware
+
+Gello includes a built-in error handler:
+
+```typescript
+import { errorHandler } from "@gello/common"
+
+const app = createApp({ port: 3000 })
+  .use(errorHandler())  // Converts errors to HTTP responses
+  .routes([...])
+```
+
+This middleware:
+- Converts known error types to appropriate HTTP status codes
+- Returns JSON error responses
+- Logs unexpected errors
+- Hides internal details in production
+
+## Tips
+
+### Keep Errors Specific
+
+```typescript
+// Good — specific and actionable
+class UserNotFoundError extends Data.TaggedError("UserNotFoundError")<{
+  userId: string
+}> {}
+
+// Less good — too generic
+class NotFoundError extends Data.TaggedError("NotFoundError")<{
+  message: string
+}> {}
+```
+
+### Include Context
+
+```typescript
+// Include information that helps debugging
+class PaymentFailedError extends Data.TaggedError("PaymentFailedError")<{
+  orderId: string
+  amount: number
+  reason: string
+  provider: string
+}> {}
+```
+
+### Let Errors Bubble
+
+You don't need to catch every error — let them bubble up to a global handler:
+
+```typescript
+// Individual route — just throw errors
+const getUser = Effect.gen(function* () {
+  const user = yield* UserRepo.findById(id)
+  if (!user) return yield* new NotFoundError({ resource: "User", id })
+  return json(user)
+})
+
+// Global handler catches everything
+app.use(errorHandler())
+```
+
+<Callout type="info">
+The error handler middleware shows full error details in development and minimal details in production for security.
+</Callout>

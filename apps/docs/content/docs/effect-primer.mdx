@@ -1,0 +1,282 @@
+---
+title: Effect Primer
+description: Just enough Effect to be productive with Gello
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+Gello is built on [Effect](https://effect.website), a TypeScript library for building reliable applications. You don't need to be an Effect expert to use Gello — this guide covers just what you need.
+
+## What is Effect?
+
+Effect is a way to write async code that's:
+- **Type-safe** — Errors are part of the type signature
+- **Composable** — Build complex operations from simple pieces
+- **Testable** — Easily swap dependencies for testing
+
+Think of it as async/await with superpowers.
+
+## The Basics
+
+### Creating Effects
+
+An Effect is a description of something that will happen. It doesn't run until you tell it to:
+
+```typescript
+import { Effect } from "effect"
+
+// This doesn't run yet — it's just a description
+const greet = Effect.succeed("Hello, world!")
+
+// This also doesn't run yet
+const fetchUser = Effect.tryPromise(() =>
+  fetch("/api/users/1").then(r => r.json())
+)
+```
+
+### Running Effects
+
+In Gello, you rarely run Effects manually — the framework does it for you. But for understanding:
+
+```typescript
+// Run and get the result
+const result = await Effect.runPromise(greet)
+console.log(result) // "Hello, world!"
+```
+
+### Effect.gen — Writing Async Code
+
+`Effect.gen` lets you write async code that looks synchronous:
+
+```typescript
+const handler = Effect.gen(function* () {
+  const user = yield* fetchUser(userId)
+  const posts = yield* fetchPosts(user.id)
+  return { user, posts }
+})
+```
+
+The `yield*` keyword "unwraps" an Effect to get its value. If any step fails, the whole thing fails — no need for try/catch everywhere.
+
+<Callout type="info">
+`yield*` is similar to `await` in async/await, but for Effects instead of Promises.
+</Callout>
+
+## Services
+
+Services are Gello's way of managing dependencies. Instead of importing and calling things directly, you ask for what you need:
+
+```typescript
+// Define what you need
+const handler = Effect.gen(function* () {
+  const userRepo = yield* UserRepo  // "Give me the UserRepo"
+  const users = yield* userRepo.findAll()
+  return json(users)
+})
+```
+
+The framework provides the actual implementation at runtime. This makes testing easy — you can swap in a mock.
+
+### Using Built-in Services
+
+Gello provides services for common needs:
+
+```typescript
+const handler = Effect.gen(function* () {
+  // Configuration
+  const config = yield* Config
+  const dbUrl = yield* config.string("DATABASE_URL")
+
+  // Caching
+  const cache = yield* Cache
+  const cached = yield* cache.get("key")
+
+  // Storage
+  const storage = yield* Storage
+  const file = yield* storage.get("path/to/file")
+
+  // ... and more
+})
+```
+
+## Error Handling
+
+In Effect, errors are part of the type. You can see what might go wrong just by looking at the types:
+
+```typescript
+// This can fail with DatabaseError or ValidationError
+const createUser = (data: UserData): Effect<User, DatabaseError | ValidationError>
+```
+
+### Catching Errors
+
+Handle specific errors:
+
+```typescript
+const handler = Effect.gen(function* () {
+  const user = yield* createUser(data)
+  return json(user)
+}).pipe(
+  Effect.catchTag("ValidationError", (error) =>
+    Effect.succeed(badRequest({ errors: error.fields }))
+  ),
+  Effect.catchTag("DatabaseError", () =>
+    Effect.succeed(internalError({ error: "Database unavailable" }))
+  )
+)
+```
+
+### Letting Errors Bubble
+
+Often, you want errors to bubble up and be handled by middleware:
+
+```typescript
+const handler = Effect.gen(function* () {
+  const user = yield* createUser(data)  // If this fails, the error bubbles up
+  return json(user)
+})
+
+// The error handler middleware converts errors to responses
+app.use(errorHandler())
+```
+
+## Layers — Providing Dependencies
+
+Layers tell Gello how to create services. You usually set these up once at app startup:
+
+```typescript
+import { Layer } from "effect"
+
+// Create your app layer by combining services
+const AppLayer = Layer.mergeAll(
+  ConfigLive,
+  DatabaseLive,
+  UserRepoLive,
+  CacheLive,
+)
+
+// Provide to your app
+runApp(app, AppLayer)
+```
+
+### For Testing
+
+Swap real services for mocks:
+
+```typescript
+const TestLayer = Layer.mergeAll(
+  ConfigTest,
+  MockDatabase,
+  MockUserRepo,
+  MockCache,
+)
+
+// Use in tests
+const result = await Effect.runPromise(
+  handler.pipe(Effect.provide(TestLayer))
+)
+```
+
+## Common Patterns
+
+### Mapping Results
+
+Transform successful results:
+
+```typescript
+const getUppercaseName = Effect.gen(function* () {
+  const user = yield* fetchUser(id)
+  return user.name.toUpperCase()
+})
+
+// Or with pipe
+const getUppercaseName = fetchUser(id).pipe(
+  Effect.map(user => user.name.toUpperCase())
+)
+```
+
+### Combining Effects
+
+Run effects in sequence:
+
+```typescript
+const handler = Effect.gen(function* () {
+  const user = yield* fetchUser(id)
+  const posts = yield* fetchPosts(user.id)
+  const comments = yield* fetchComments(posts[0].id)
+  return { user, posts, comments }
+})
+```
+
+Run effects in parallel:
+
+```typescript
+const handler = Effect.gen(function* () {
+  const [users, posts, stats] = yield* Effect.all([
+    fetchUsers(),
+    fetchPosts(),
+    fetchStats(),
+  ])
+  return { users, posts, stats }
+})
+```
+
+### Optional Values
+
+Handle values that might not exist:
+
+```typescript
+import { Option } from "effect"
+
+const handler = Effect.gen(function* () {
+  const user = yield* findUser(id)  // Returns Option<User>
+
+  if (Option.isNone(user)) {
+    return notFound({ error: "User not found" })
+  }
+
+  return json(user.value)
+})
+```
+
+## Tips
+
+### Don't Worry About Being "Pure"
+
+You don't need to make everything an Effect. Regular TypeScript works fine for simple operations:
+
+```typescript
+const handler = Effect.gen(function* () {
+  const user = yield* fetchUser(id)
+
+  // Regular TypeScript is fine here
+  const fullName = `${user.firstName} ${user.lastName}`
+  const initials = fullName.split(" ").map(n => n[0]).join("")
+
+  return json({ ...user, fullName, initials })
+})
+```
+
+### Use the Gello Helpers
+
+Gello wraps common operations so you don't have to think about Effect:
+
+```typescript
+// These are already Effects — just yield* them
+const id = yield* getParam("id")
+const body = yield* getJsonBody()
+const user = yield* Auth.user()
+```
+
+### Start Simple
+
+You can use Gello without understanding all of Effect. Start with:
+- `Effect.gen` and `yield*` for handlers
+- Built-in services via `yield* ServiceName`
+- Error handling middleware
+
+Learn more as you need it.
+
+<Callout type="info">
+For a deeper dive into Effect, check out the [Effect documentation](https://effect.website/docs/introduction).
+</Callout>

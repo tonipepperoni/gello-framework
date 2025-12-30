@@ -1,0 +1,232 @@
+---
+title: Logging
+description: Log messages and debug your application
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+Gello provides a flexible logging system that works out of the box and can be customized for production.
+
+## Basic Usage
+
+```typescript
+import { Log } from "@gello/core"
+
+const handler = Effect.gen(function* () {
+  yield* Log.info("Processing request")
+  yield* Log.debug("User ID: " + userId)
+
+  try {
+    yield* doSomething()
+    yield* Log.info("Operation completed")
+  } catch (error) {
+    yield* Log.error("Operation failed", { error })
+  }
+})
+```
+
+## Log Levels
+
+From least to most severe:
+
+```typescript
+yield* Log.debug("Detailed debugging info")
+yield* Log.info("General information")
+yield* Log.warning("Something unexpected")
+yield* Log.error("Something went wrong")
+yield* Log.fatal("Application cannot continue")
+```
+
+## Structured Logging
+
+Add context to your logs:
+
+```typescript
+yield* Log.info("User logged in", {
+  userId: user.id,
+  email: user.email,
+  ip: request.ip,
+})
+
+yield* Log.error("Payment failed", {
+  orderId: order.id,
+  amount: order.total,
+  error: error.message,
+})
+```
+
+## Request Logging
+
+Gello automatically logs HTTP requests. Enable it in your app config:
+
+```typescript
+const app = createApp({
+  port: 3000,
+  logging: true,  // Enabled by default
+})
+```
+
+This logs:
+```
+[INFO] GET /api/users 200 45ms
+[INFO] POST /api/posts 201 120ms
+[WARN] GET /api/missing 404 5ms
+```
+
+## Configuring Output
+
+### Console (Development)
+
+```typescript
+import { consoleDriver } from "@gello/core"
+
+const LoggerLive = consoleDriver({
+  colors: true,
+  timestamps: true,
+})
+```
+
+### JSON (Production)
+
+For log aggregation services:
+
+```typescript
+import { jsonDriver } from "@gello/core"
+
+const LoggerLive = jsonDriver()
+```
+
+Outputs:
+```json
+{"level":"info","message":"User logged in","userId":"123","timestamp":"2024-01-15T10:30:00Z"}
+```
+
+### File
+
+Write logs to files:
+
+```typescript
+import { fileDriver } from "@gello/core"
+
+const LoggerLive = fileDriver({
+  path: "/var/log/myapp",
+  filename: "app.log",
+  maxSize: "10mb",
+  maxFiles: 5,
+})
+```
+
+### Multiple Outputs
+
+Log to multiple destinations:
+
+```typescript
+import { multiDriver, consoleDriver, fileDriver } from "@gello/core"
+
+const LoggerLive = multiDriver([
+  consoleDriver(),
+  fileDriver({ path: "/var/log/myapp" }),
+])
+```
+
+## Log Levels by Environment
+
+Set different log levels for different environments:
+
+```bash
+# .env.development
+LOG_LEVEL=debug
+
+# .env.production
+LOG_LEVEL=info
+```
+
+```typescript
+const LoggerLive = consoleDriver({
+  minLevel: process.env.LOG_LEVEL || "info",
+})
+```
+
+## Contextual Logging
+
+Add context that applies to all logs in a scope:
+
+```typescript
+const processOrder = (orderId: string) =>
+  Effect.gen(function* () {
+    yield* Log.info("Processing order")
+    yield* chargePayment()
+    yield* Log.info("Payment charged")
+    yield* fulfillOrder()
+    yield* Log.info("Order fulfilled")
+  }).pipe(
+    Log.withContext({ orderId })
+  )
+
+// All logs include orderId
+// [INFO] Processing order orderId=abc123
+// [INFO] Payment charged orderId=abc123
+// [INFO] Order fulfilled orderId=abc123
+```
+
+## Hiding Sensitive Data
+
+Automatically redact sensitive fields:
+
+```typescript
+const LoggerLive = consoleDriver({
+  redact: ["password", "token", "secret", "authorization"],
+})
+
+// password field is hidden
+yield* Log.info("Login attempt", { email, password })
+// [INFO] Login attempt email=alice@example.com password=[REDACTED]
+```
+
+## Performance Logging
+
+Log slow operations:
+
+```typescript
+import { timed } from "@gello/core"
+
+const slowOperation = Effect.gen(function* () {
+  // ... do something slow
+}).pipe(timed("slow-operation"))
+
+// [INFO] slow-operation completed in 1234ms
+```
+
+## Testing
+
+Capture logs in tests:
+
+```typescript
+import { memoryDriver, getLogs } from "@gello/testing"
+
+it("logs errors", async () => {
+  const logs = await runWithLogs(handler)
+
+  expect(logs).toContainEqual(
+    expect.objectContaining({
+      level: "error",
+      message: "Something went wrong",
+    })
+  )
+})
+```
+
+## Quick Reference
+
+| Method | Use Case |
+|--------|----------|
+| `Log.debug()` | Detailed info for debugging |
+| `Log.info()` | General operational messages |
+| `Log.warning()` | Unexpected but handled situations |
+| `Log.error()` | Errors that need attention |
+| `Log.fatal()` | Application cannot continue |
+| `Log.withContext()` | Add context to a scope |
+
+<Callout type="info">
+In production, consider using a log aggregation service like Datadog, Logtail, or CloudWatch. Use the JSON driver for easy parsing.
+</Callout>

@@ -52,18 +52,19 @@ jobs:
       #   run: pnpm test
 
       - name: Build all packages
-        run: pnpm nx run-many -t build --projects='gello-*'
+        # TODO: Re-enable gello-queue once queue-worker build issue is fixed
+        run: pnpm nx run-many -t build --projects='gello-*' --exclude='gello-queue'
 
       - name: Version and publish packages (dry run)
         if: ${{ inputs.dry_run == 'true' }}
-        run: pnpm nx run-many -t version --projects='gello-*' -- --dry-run
+        run: pnpm nx run-many -t version --projects='gello-*' --exclude='gello-queue' -- --dry-run
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Version and publish packages
         if: ${{ inputs.dry_run != 'true' }}
-        run: pnpm nx run-many -t version --projects='gello-*' --parallel=1
+        run: pnpm nx run-many -t version --projects='gello-*' --exclude='gello-queue' --parallel=1
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
